@@ -1,0 +1,2 @@
+C:\Users\weral\OneDrive - Microsoft\2.1 Client Profiles\43. Nedbank\388 Nedbank Storage Request - Discuss Azure Storage Explorer\DotNet\AzureStorageManager\publish\AzureStorageManager.pdb
+C:\Users\weral\OneDrive - Microsoft\2.1 Client Profiles\43. Nedbank\388 Nedbank Storage Request - Discuss Azure Storage Explorer\DotNet\AzureStorageManager\publish\AzureStorageManager.exe
