@@ -23,3 +23,46 @@
    ```bash
    git clone https://github.com/yourusername/azure-storage-manager-tool.git
    cd azure-storage-manager-tool
+   
+2. **Build and Publish the Application**:
+
+   ```bash
+   dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o ./publish
+   
+3. **Run the Application**:
+
+   Navigate to the `publish` folder and execute `AzureStorageManager.exe`.
+
+   ```bash
+   cd publish
+   AzureStorageManager.exe
+   
+## Usage
+
+1. **Start the Application**  
+   Run `AzureStorageManager.exe` from the command line.
+
+2. **Follow the Prompts**:
+   - **Enter Azure Storage Account Name and Key**: The tool will prompt you for these details to connect to your Azure storage.
+   - **Select Storage Type**: Choose between Azure Blob Storage and Azure File Share.
+   - **Provide the Container or File Share Name**: Enter the name of the Blob container or File Share you want to verify.
+   - **Enter Local Directory Path**: Input the path to the directory containing your original files.
+
+3. **Review the Output**:
+   - The tool will process each file, display the MD5 hash comparison, and indicate if the hashes match.
+   - A CSV report named `BlobStorageReport.csv` or `FileShareReport.csv` will be generated in the same directory, summarizing the verification results.
+
+## Scenarios for Use
+
+- **After file uploads** to Azure, to confirm all files uploaded correctly.
+- **Routine integrity checks** to ensure ongoing data accuracy.
+- **Post-migration** validation, for example when moving data within Azure.
+- **Disaster recovery or backup validation** to ensure backup files are intact.
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+## Contributing
+
+If you'd like to contribute, please fork the repository and make a pull request. For major changes, please open an issue first to discuss what you would like to change.
