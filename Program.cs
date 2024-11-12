@@ -95,6 +95,10 @@ namespace AzureStorageManager
             {
                 Console.WriteLine("Invalid choice. Please restart the application and choose a valid option.");
             }
+
+            // Keep the console open
+            Console.WriteLine("Press Enter to exit the application...");
+            Console.ReadLine();
         }
 
         private static void DisplayIntroduction()
