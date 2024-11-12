@@ -27,7 +27,7 @@
 2. **Build and Publish the Application**:
 
    ```bash
-   dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o ./publish
+   dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:IncludeAllContentForSelfExtract=true
    
 3. **Run the Application**:
 
