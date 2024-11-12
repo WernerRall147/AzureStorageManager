@@ -34,14 +34,21 @@ namespace AzureStorageManager.Services
                 Console.WriteLine($"Local MD5: {localHash}");
                 Console.WriteLine($"Blob MD5 Metadata: {blobHash}");
 
+                // Check if the remote hash matches; update only if it doesn't match or is missing
                 if (blobHash == null || blobHash != localHash)
                 {
+                    Console.WriteLine($"Updating Blob MD5 metadata for: {blobItem.Name}");
                     await blobClient.SetMetadataAsync(new Dictionary<string, string> { { "md5", localHash } });
+
+                    // Re-fetch the properties to confirm the metadata was set
+                    blobProperties = await blobClient.GetPropertiesAsync();
+                    blobProperties.Value.Metadata.TryGetValue("md5", out blobHash);
                 }
 
+                // Add to the report with the most recent metadata information
                 fileMetadataList.Add(new FileMetadata(blobItem.Name, localHash, blobHash ?? ""));
 
-                File.Delete(tempFilePath);
+               // File.Delete(tempFilePath);
             }
 
             CsvExporter.ExportToCsv(fileMetadataList, "BlobStorageReport.csv");
