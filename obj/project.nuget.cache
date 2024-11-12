@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "Biznd+NtPAY=",
+  "dgSpecHash": "ToNHDzGsOXs=",
   "success": true,
-  "projectFilePath": "C:\\Users\\weral\\OneDrive - Microsoft\\2.1 Client Profiles\\43. Nedbank\\388 Nedbank Storage Request - Discuss Azure Storage Explorer\\DotNet\\AzureStorageManager\\AzureStorageManager.csproj",
+  "projectFilePath": "C:\\Users\\weral\\Git\\AzureStorageManager\\AzureStorageManager.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\weral\\.nuget\\packages\\azure.core\\1.44.1\\azure.core.1.44.1.nupkg.sha512",
     "C:\\Users\\weral\\.nuget\\packages\\azure.identity\\1.13.1\\azure.identity.1.13.1.nupkg.sha512",
@@ -26,7 +26,6 @@
     "C:\\Users\\weral\\.nuget\\packages\\system.text.json\\6.0.10\\system.text.json.6.0.10.nupkg.sha512",
     "C:\\Users\\weral\\.nuget\\packages\\system.threading.tasks.extensions\\4.5.4\\system.threading.tasks.extensions.4.5.4.nupkg.sha512",
     "C:\\Users\\weral\\.nuget\\packages\\microsoft.netcore.app.runtime.win-x64\\9.0.0-rc.2.24473.5\\microsoft.netcore.app.runtime.win-x64.9.0.0-rc.2.24473.5.nupkg.sha512",
-    "C:\\Users\\weral\\.nuget\\packages\\microsoft.netcore.app.crossgen2.win-x64\\9.0.0-rc.2.24473.5\\microsoft.netcore.app.crossgen2.win-x64.9.0.0-rc.2.24473.5.nupkg.sha512",
     "C:\\Users\\weral\\.nuget\\packages\\microsoft.windowsdesktop.app.runtime.win-x64\\9.0.0-rc.2.24474.4\\microsoft.windowsdesktop.app.runtime.win-x64.9.0.0-rc.2.24474.4.nupkg.sha512",
     "C:\\Users\\weral\\.nuget\\packages\\microsoft.aspnetcore.app.runtime.win-x64\\9.0.0-rc.2.24474.3\\microsoft.aspnetcore.app.runtime.win-x64.9.0.0-rc.2.24474.3.nupkg.sha512"
   ],

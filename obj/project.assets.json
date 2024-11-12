@@ -1257,11 +1257,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\weral\\OneDrive - Microsoft\\2.1 Client Profiles\\43. Nedbank\\388 Nedbank Storage Request - Discuss Azure Storage Explorer\\DotNet\\AzureStorageManager\\AzureStorageManager.csproj",
+      "projectUniqueName": "C:\\Users\\weral\\Git\\AzureStorageManager\\AzureStorageManager.csproj",
       "projectName": "AzureStorageManager",
-      "projectPath": "C:\\Users\\weral\\OneDrive - Microsoft\\2.1 Client Profiles\\43. Nedbank\\388 Nedbank Storage Request - Discuss Azure Storage Explorer\\DotNet\\AzureStorageManager\\AzureStorageManager.csproj",
+      "projectPath": "C:\\Users\\weral\\Git\\AzureStorageManager\\AzureStorageManager.csproj",
       "packagesPath": "C:\\Users\\weral\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\weral\\OneDrive - Microsoft\\2.1 Client Profiles\\43. Nedbank\\388 Nedbank Storage Request - Discuss Azure Storage Explorer\\DotNet\\AzureStorageManager\\obj\\",
+      "outputPath": "C:\\Users\\weral\\Git\\AzureStorageManager\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -1334,10 +1334,6 @@
           {
             "name": "Microsoft.AspNetCore.App.Runtime.win-x64",
             "version": "[9.0.0-rc.2.24474.3, 9.0.0-rc.2.24474.3]"
-          },
-          {
-            "name": "Microsoft.NETCore.App.Crossgen2.win-x64",
-            "version": "[9.0.0-rc.2.24473.5, 9.0.0-rc.2.24473.5]"
           },
           {
             "name": "Microsoft.NETCore.App.Runtime.win-x64",
