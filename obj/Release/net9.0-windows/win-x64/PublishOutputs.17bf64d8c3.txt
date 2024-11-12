@@ -1,0 +1,2 @@
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\win-x64\publish\AzureStorageManager.pdb
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\win-x64\publish\AzureStorageManager.exe
