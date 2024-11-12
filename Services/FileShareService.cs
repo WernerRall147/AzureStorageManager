@@ -23,7 +23,7 @@ namespace AzureStorageManager.Services
             {
                 var fileClient = _shareClient.GetRootDirectoryClient().GetFileClient(fileItem.Name);
                 string tempFilePath = Path.Combine(localDirectory, fileItem.Name);
-                
+
                 using (var downloadStream = (await fileClient.DownloadAsync()).Value.Content)
                 using (var fileStream = File.Create(tempFilePath))
                 {
@@ -34,14 +34,24 @@ namespace AzureStorageManager.Services
                 var fileProperties = await fileClient.GetPropertiesAsync();
                 fileProperties.Value.Metadata.TryGetValue("md5", out string fileHash);
 
+                Console.WriteLine($"Local MD5: {localHash}");
+                Console.WriteLine($"File Share MD5 Metadata: {fileHash}");
+
+                // Check if the remote hash matches; update only if it doesn't match or is missing
                 if (fileHash == null || fileHash != localHash)
                 {
+                    Console.WriteLine($"Updating File Share MD5 metadata for: {fileItem.Name}");
                     await fileClient.SetMetadataAsync(new Dictionary<string, string> { { "md5", localHash } });
+
+                    // Re-fetch the properties to confirm the metadata was set
+                    fileProperties = await fileClient.GetPropertiesAsync();
+                    fileProperties.Value.Metadata.TryGetValue("md5", out fileHash);
                 }
 
+                // Add to the report with the most recent metadata information
                 fileMetadataList.Add(new FileMetadata(fileItem.Name, localHash, fileHash ?? ""));
 
-                File.Delete(tempFilePath);
+               // File.Delete(tempFilePath);
             }
 
             CsvExporter.ExportToCsv(fileMetadataList, "FileShareReport.csv");
