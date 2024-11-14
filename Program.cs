@@ -4,6 +4,7 @@ using Azure.Storage.Files.Shares;
 using AzureStorageManager.Services;
 using System.Security.Cryptography.X509Certificates;
 using System.Security.Cryptography;
+using System.IO;
 
 namespace AzureStorageManager
 {
@@ -56,7 +57,7 @@ namespace AzureStorageManager
                     // Initialize BlobServiceClient with ClientCertificateCredential
                     var blobServiceClient = new BlobServiceClient(new Uri($"https://{storageAccountName}.blob.core.windows.net"), clientCertificateCredential);
                     var blobStorageService = new BlobStorageService(blobServiceClient, blobContainerName);
-                    await blobStorageService.ListAndVerifyBlobsAsync(localDirectory);
+                    await blobStorageService.ListAndVerifyBlobsAsync(localDirectory, $"BlobStorageReport_{Path.GetFileName(localDirectory)}.csv");
                 }
                 catch (Exception ex)
                 {
@@ -84,7 +85,7 @@ namespace AzureStorageManager
                     var shareClient = shareServiceClient.GetShareClient(fileShareName);
 
                     var fileShareService = new FileShareService(shareClient);
-                    await fileShareService.ListAndVerifyFilesAsync(localDirectory);
+                    await fileShareService.ListAndVerifyFilesAsync(localDirectory, $"FileShareReport_{Path.GetFileName(localDirectory)}.csv");
                 }
                 catch (UriFormatException uriEx)
                 {
