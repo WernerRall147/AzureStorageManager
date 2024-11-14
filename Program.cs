@@ -1,9 +1,8 @@
-﻿using System;
-using System.Threading.Tasks;
-using Azure.Identity;
+﻿using Azure.Identity;
 using Azure.Storage.Blobs;
 using Azure.Storage.Files.Shares;
 using AzureStorageManager.Services;
+using System.IO;
 
 namespace AzureStorageManager
 {
@@ -21,7 +20,7 @@ namespace AzureStorageManager
             Console.WriteLine("1. Blob Storage");
             Console.WriteLine("2. File Share");
 
-            string choice = Console.ReadLine() ?? ""; // Ensures no null value
+            string choice = Console.ReadLine() ?? "";
 
             // Prompt user for local directory path
             Console.Write("Enter the local directory path for file operations: ");
@@ -34,6 +33,9 @@ namespace AzureStorageManager
                 return;
             }
 
+            // Use DefaultAzureCredential for Managed Identity
+            var credential = new DefaultAzureCredential();
+
             if (choice == "1")
             {
                 Console.Write("Enter your Azure Blob Container Name: ");
@@ -43,13 +45,10 @@ namespace AzureStorageManager
 
                 try
                 {
-                    // Initialize BlobServiceClient with Managed Identity
-                    var blobServiceClient = new BlobServiceClient(
-                        new Uri($"https://{storageAccountName}.blob.core.windows.net"),
-                        new DefaultAzureCredential());
-
+                    // Initialize BlobServiceClient with DefaultAzureCredential
+                    var blobServiceClient = new BlobServiceClient(new Uri($"https://{storageAccountName}.blob.core.windows.net"), credential);
                     var blobStorageService = new BlobStorageService(blobServiceClient, blobContainerName);
-                    await blobStorageService.ListAndVerifyBlobsAsync(localDirectory);
+                    await blobStorageService.ListAndVerifyBlobsAsync(localDirectory, $"BlobStorageReport_{Path.GetFileName(localDirectory)}.csv");
                 }
                 catch (Exception ex)
                 {
@@ -71,16 +70,13 @@ namespace AzureStorageManager
                         return;
                     }
 
-                    // Initialize ShareServiceClient with Managed Identity
+                    // Initialize ShareServiceClient with DefaultAzureCredential
                     string fileShareUri = $"https://{storageAccountName}.file.core.windows.net";
-                    var shareServiceClient = new ShareServiceClient(
-                        new Uri(fileShareUri),
-                        new DefaultAzureCredential());
-
+                    var shareServiceClient = new ShareServiceClient(new Uri(fileShareUri), credential);
                     var shareClient = shareServiceClient.GetShareClient(fileShareName);
 
                     var fileShareService = new FileShareService(shareClient);
-                    await fileShareService.ListAndVerifyFilesAsync(localDirectory);
+                    await fileShareService.ListAndVerifyFilesAsync(localDirectory, $"FileShareReport_{Path.GetFileName(localDirectory)}.csv");
                 }
                 catch (UriFormatException uriEx)
                 {
