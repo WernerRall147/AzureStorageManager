@@ -1,9 +1,9 @@
-﻿using System;
-using System.Threading.Tasks;
-using Azure.Identity;
+﻿using Azure.Identity;
 using Azure.Storage.Blobs;
 using Azure.Storage.Files.Shares;
 using AzureStorageManager.Services;
+using System.Security.Cryptography.X509Certificates;
+using System.Security.Cryptography;
 
 namespace AzureStorageManager
 {
@@ -13,6 +13,16 @@ namespace AzureStorageManager
         {
             DisplayIntroduction();
 
+            // Hardcoded Azure AD credentials
+            string tenantId = "<your-tenant-id>";
+            string clientId = "<your-client-id>";
+            string certificatePath = "<path-to-your-pfx-file>";
+            string certificatePassword = "<pfx-password>";
+
+            // Create the ClientCertificateCredential using X509CertificateLoader
+            var certificate = X509Certificate2.CreateFromEncryptedPemFile(certificatePath, certificatePassword);
+            var clientCertificateCredential = new ClientCertificateCredential(tenantId, clientId, certificate);
+
             // Prompt user for storage account details
             Console.Write("Enter your Azure Storage Account Name: ");
             string storageAccountName = Console.ReadLine() ?? "";
@@ -21,7 +31,7 @@ namespace AzureStorageManager
             Console.WriteLine("1. Blob Storage");
             Console.WriteLine("2. File Share");
 
-            string choice = Console.ReadLine() ?? ""; // Ensures no null value
+            string choice = Console.ReadLine() ?? "";
 
             // Prompt user for local directory path
             Console.Write("Enter the local directory path for file operations: ");
@@ -43,11 +53,8 @@ namespace AzureStorageManager
 
                 try
                 {
-                    // Initialize BlobServiceClient with Managed Identity
-                    var blobServiceClient = new BlobServiceClient(
-                        new Uri($"https://{storageAccountName}.blob.core.windows.net"),
-                        new DefaultAzureCredential());
-
+                    // Initialize BlobServiceClient with ClientCertificateCredential
+                    var blobServiceClient = new BlobServiceClient(new Uri($"https://{storageAccountName}.blob.core.windows.net"), clientCertificateCredential);
                     var blobStorageService = new BlobStorageService(blobServiceClient, blobContainerName);
                     await blobStorageService.ListAndVerifyBlobsAsync(localDirectory);
                 }
@@ -71,12 +78,9 @@ namespace AzureStorageManager
                         return;
                     }
 
-                    // Initialize ShareServiceClient with Managed Identity
+                    // Initialize ShareServiceClient with ClientCertificateCredential
                     string fileShareUri = $"https://{storageAccountName}.file.core.windows.net";
-                    var shareServiceClient = new ShareServiceClient(
-                        new Uri(fileShareUri),
-                        new DefaultAzureCredential());
-
+                    var shareServiceClient = new ShareServiceClient(new Uri(fileShareUri), clientCertificateCredential);
                     var shareClient = shareServiceClient.GetShareClient(fileShareName);
 
                     var fileShareService = new FileShareService(shareClient);
