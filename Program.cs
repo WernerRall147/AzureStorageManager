@@ -1,9 +1,9 @@
-﻿using System;
-using System.Threading.Tasks;
-using Azure.Identity;
+﻿using Azure.Identity;
 using Azure.Storage.Blobs;
 using Azure.Storage.Files.Shares;
 using AzureStorageManager.Services;
+using System.Security.Cryptography.X509Certificates;
+using System.Security.Cryptography;
 
 namespace AzureStorageManager
 {
@@ -13,14 +13,19 @@ namespace AzureStorageManager
         {
             DisplayIntroduction();
 
+            // Hardcoded Azure AD credentials
+            string tenantId = "<your-tenant-id>";
+            string clientId = "<your-client-id>";
+            string certificatePath = "<path-to-your-pfx-file>";
+            string certificatePassword = "<pfx-password>";
+
+            // Create the ClientCertificateCredential using X509CertificateLoader
+            var certificate = X509Certificate2.CreateFromEncryptedPemFile(certificatePath, certificatePassword);
+            var clientCertificateCredential = new ClientCertificateCredential(tenantId, clientId, certificate);
+
             // Prompt user for storage account details
             Console.Write("Enter your Azure Storage Account Name: ");
             string storageAccountName = Console.ReadLine() ?? "";
-
-            // Azure AD credentials
-            string tenantId = "<your-tenant-id>";
-            string clientId = "<your-client-id>";
-            string clientSecret = "<your-client-secret>";
 
             Console.WriteLine("Choose Storage Type:");
             Console.WriteLine("1. Blob Storage");
@@ -39,9 +44,6 @@ namespace AzureStorageManager
                 return;
             }
 
-            // Use ClientSecretCredential for Authentication
-            var clientSecretCredential = new ClientSecretCredential(tenantId, clientId, clientSecret);
-
             if (choice == "1")
             {
                 Console.Write("Enter your Azure Blob Container Name: ");
@@ -51,10 +53,10 @@ namespace AzureStorageManager
 
                 try
                 {
-                    // Initialize BlobServiceClient with ClientSecretCredential
-                    var blobServiceClient = new BlobServiceClient(new Uri($"https://{storageAccountName}.blob.core.windows.net"), clientSecretCredential);
+                    // Initialize BlobServiceClient with ClientCertificateCredential
+                    var blobServiceClient = new BlobServiceClient(new Uri($"https://{storageAccountName}.blob.core.windows.net"), clientCertificateCredential);
                     var blobStorageService = new BlobStorageService(blobServiceClient, blobContainerName);
-                    await blobStorageService.ListAndVerifyBlobsAsync(localDirectory);
+                    await blobStorageService.ListAndVerifyBlobsAsync(localDirectory, $"BlobStorageReport_{Path.GetFileName(localDirectory)}.csv");
                 }
                 catch (Exception ex)
                 {
@@ -76,13 +78,13 @@ namespace AzureStorageManager
                         return;
                     }
 
-                    // Initialize ShareServiceClient with ClientSecretCredential
+                    // Initialize ShareServiceClient with ClientCertificateCredential
                     string fileShareUri = $"https://{storageAccountName}.file.core.windows.net";
-                    var shareServiceClient = new ShareServiceClient(new Uri(fileShareUri), clientSecretCredential);
+                    var shareServiceClient = new ShareServiceClient(new Uri(fileShareUri), clientCertificateCredential);
                     var shareClient = shareServiceClient.GetShareClient(fileShareName);
 
                     var fileShareService = new FileShareService(shareClient);
-                    await fileShareService.ListAndVerifyFilesAsync(localDirectory);
+                    await fileShareService.ListAndVerifyFilesAsync(localDirectory, $"FileShareReport_{Path.GetFileName(localDirectory)}.csv");
                 }
                 catch (UriFormatException uriEx)
                 {

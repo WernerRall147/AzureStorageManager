@@ -15,7 +15,7 @@ namespace AzureStorageManager.Services
             _containerClient = blobServiceClient.GetBlobContainerClient(containerName);
         }
 
-        public async Task ListAndVerifyBlobsAsync(string localDirectory)
+        public async Task ListAndVerifyBlobsAsync(string localDirectory, string csvFileName)
         {
             var fileMetadataList = new List<FileMetadata>();
 
@@ -34,7 +34,6 @@ namespace AzureStorageManager.Services
                 Console.WriteLine($"Local MD5: {localHash}");
                 Console.WriteLine($"Blob MD5 Metadata: {blobHash}");
 
-                // Check if the remote hash matches; update only if it doesn't match or is missing
                 if (blobHash == null || blobHash != localHash)
                 {
                     Console.WriteLine($"Updating Blob MD5 metadata for: {blobItem.Name}");
@@ -45,13 +44,10 @@ namespace AzureStorageManager.Services
                     blobProperties.Value.Metadata.TryGetValue("md5", out blobHash);
                 }
 
-                // Add to the report with the most recent metadata information
                 fileMetadataList.Add(new FileMetadata(blobItem.Name, localHash, blobHash ?? ""));
-
-               // File.Delete(tempFilePath);
             }
 
-            CsvExporter.ExportToCsv(fileMetadataList, "BlobStorageReport.csv");
+            CsvExporter.ExportToCsv(fileMetadataList, csvFileName);
         }
     }
 }
