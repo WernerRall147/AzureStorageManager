@@ -17,11 +17,16 @@ namespace AzureStorageManager
             Console.Write("Enter your Azure Storage Account Name: ");
             string storageAccountName = Console.ReadLine() ?? "";
 
+            // Azure AD credentials
+            string tenantId = "<your-tenant-id>";
+            string clientId = "<your-client-id>";
+            string clientSecret = "<your-client-secret>";
+
             Console.WriteLine("Choose Storage Type:");
             Console.WriteLine("1. Blob Storage");
             Console.WriteLine("2. File Share");
 
-            string choice = Console.ReadLine() ?? ""; // Ensures no null value
+            string choice = Console.ReadLine() ?? "";
 
             // Prompt user for local directory path
             Console.Write("Enter the local directory path for file operations: ");
@@ -34,6 +39,9 @@ namespace AzureStorageManager
                 return;
             }
 
+            // Use ClientSecretCredential for Authentication
+            var clientSecretCredential = new ClientSecretCredential(tenantId, clientId, clientSecret);
+
             if (choice == "1")
             {
                 Console.Write("Enter your Azure Blob Container Name: ");
@@ -43,11 +51,8 @@ namespace AzureStorageManager
 
                 try
                 {
-                    // Initialize BlobServiceClient with Managed Identity
-                    var blobServiceClient = new BlobServiceClient(
-                        new Uri($"https://{storageAccountName}.blob.core.windows.net"),
-                        new DefaultAzureCredential());
-
+                    // Initialize BlobServiceClient with ClientSecretCredential
+                    var blobServiceClient = new BlobServiceClient(new Uri($"https://{storageAccountName}.blob.core.windows.net"), clientSecretCredential);
                     var blobStorageService = new BlobStorageService(blobServiceClient, blobContainerName);
                     await blobStorageService.ListAndVerifyBlobsAsync(localDirectory);
                 }
@@ -71,12 +76,9 @@ namespace AzureStorageManager
                         return;
                     }
 
-                    // Initialize ShareServiceClient with Managed Identity
+                    // Initialize ShareServiceClient with ClientSecretCredential
                     string fileShareUri = $"https://{storageAccountName}.file.core.windows.net";
-                    var shareServiceClient = new ShareServiceClient(
-                        new Uri(fileShareUri),
-                        new DefaultAzureCredential());
-
+                    var shareServiceClient = new ShareServiceClient(new Uri(fileShareUri), clientSecretCredential);
                     var shareClient = shareServiceClient.GetShareClient(fileShareName);
 
                     var fileShareService = new FileShareService(shareClient);
