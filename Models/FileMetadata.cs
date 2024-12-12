@@ -5,15 +5,23 @@ namespace AzureStorageManager.Models
         public string FileName { get; set; }
         public string LocalHash { get; set; }
         public string RemoteHash { get; set; }
-        public bool IsHashMatch => LocalHash == RemoteHash;
-        public string Status => IsHashMatch ? "Match" : "Mismatch";
+        public string Status { get; set; }
 
-        // Constructor to initialize properties
-        public FileMetadata(string fileName, string localHash, string remoteHash)
+        // Constructor that sets all properties, including a custom status.
+        public FileMetadata(string fileName, string localHash, string remoteHash, string status)
         {
             FileName = fileName;
             LocalHash = localHash;
             RemoteHash = remoteHash;
+            Status = status;
+        }
+
+        // Optional: If you often need a "Match"/"Mismatch" status based solely on hash comparison,
+        // you can still provide a helper constructor or method. For example:
+        public static FileMetadata FromHashes(string fileName, string localHash, string remoteHash)
+        {
+            string status = (localHash == remoteHash) ? "Match" : "Mismatch";
+            return new FileMetadata(fileName, localHash, remoteHash, status);
         }
     }
 }

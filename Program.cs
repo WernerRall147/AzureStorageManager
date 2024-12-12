@@ -1,9 +1,13 @@
-﻿using Azure.Identity;
+﻿using Azure.Core;
+using Azure.Core.Pipeline;
+using Azure.Identity;
 using Azure.Storage.Blobs;
 using Azure.Storage.Files.Shares;
 using AzureStorageManager.Services;
-using System.Security.Cryptography.X509Certificates;
+using Microsoft.Extensions.Configuration;
+using System;
 using System.IO;
+using System.Security.Cryptography.X509Certificates;
 
 namespace AzureStorageManager
 {
@@ -13,12 +17,21 @@ namespace AzureStorageManager
         {
             DisplayIntroduction();
 
-            // Hardcoded Azure AD credentials
-            string tenantId = "#TODO";
-            string clientId = "#TODO";
-            string thumbprint = "#TODO";
+            // Load configuration
+            var config = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("appsettings.json", optional: false)
+                // AddEnvironmentVariables requires Microsoft.Extensions.Configuration.EnvironmentVariables package
+                .AddEnvironmentVariables()
+                .Build();
 
-            // Load the certificate from the Windows Certificate Store
+            string tenantId = config["Azure:TenantId"] ?? "";
+            string clientId = config["Azure:ClientId"] ?? "";
+            string thumbprint = config["Azure:CertificateThumbprint"] ?? "";
+            string clientSecret = config["Azure:ClientSecret"] ?? "";
+
+            // Load certificate from Windows Certificate Store
+            Console.WriteLine("Loading certificate from Windows Certificate Store...");
             X509Certificate2 certificate = null;
             using (var store = new X509Store(StoreName.My, StoreLocation.CurrentUser))
             {
@@ -28,17 +41,40 @@ namespace AzureStorageManager
                 if (certCollection.Count > 0)
                 {
                     certificate = certCollection[0];
+                    Console.WriteLine($"Certificate loaded successfully: {certificate.Subject}");
                 }
                 else
                 {
-                    Console.WriteLine("Certificate not found.");
-                    return;
+                    Console.WriteLine("Certificate not found. Will attempt fallback to client secret authentication.");
                 }
 
                 store.Close();
             }
 
-            var clientCertificateCredential = new ClientCertificateCredential(tenantId, clientId, certificate);
+            // Initialize credentials: try certificate first, then fallback to client secret
+            TokenCredential credential;
+            if (certificate != null)
+            {
+                Console.WriteLine("Initializing ClientCertificateCredential...");
+                credential = new ClientCertificateCredential(tenantId, clientId, certificate);
+            }
+            else
+            {
+                if (string.IsNullOrEmpty(clientSecret))
+                {
+                    // If client secret isn't in appsettings, check environment variable
+                    clientSecret = Environment.GetEnvironmentVariable("AZURE_CLIENT_SECRET") ?? "";
+                }
+
+                if (string.IsNullOrEmpty(clientSecret))
+                {
+                    Console.WriteLine("No client secret provided and certificate not found. Cannot authenticate.");
+                    return;
+                }
+
+                Console.WriteLine("Initializing ClientSecretCredential...");
+                credential = new ClientSecretCredential(tenantId, clientId, clientSecret);
+            }
 
             // Prompt user for storage account details
             Console.Write("Enter your Azure Storage Account Name: ");
@@ -47,77 +83,62 @@ namespace AzureStorageManager
             Console.WriteLine("Choose Storage Type:");
             Console.WriteLine("1. Blob Storage");
             Console.WriteLine("2. File Share");
-
             string choice = Console.ReadLine() ?? "";
 
-            // Prompt user for local directory path
             Console.Write("Enter the local directory path for file operations: ");
             string localDirectory = Console.ReadLine() ?? "";
 
-            // Check if storage account name is present
             if (string.IsNullOrEmpty(storageAccountName))
             {
                 Console.WriteLine("Storage account name is missing. Please check your input.");
                 return;
             }
 
-            if (choice == "1")
+            try
             {
-                Console.Write("Enter your Azure Blob Container Name: ");
-                string blobContainerName = Console.ReadLine() ?? "";
-
-                Console.WriteLine("Connecting to Blob Storage...");
-
-                try
+                if (choice == "1")
                 {
-                    // Initialize BlobServiceClient with ClientCertificateCredential
-                    var blobServiceClient = new BlobServiceClient(new Uri($"https://{storageAccountName}.blob.core.windows.net"), clientCertificateCredential);
+                    // Blob Storage
+                    Console.Write("Enter your Azure Blob Container Name: ");
+                    string blobContainerName = Console.ReadLine() ?? "";
+
+                    Console.WriteLine("Connecting to Blob Storage...");
+                    var blobServiceClient = new BlobServiceClient(new Uri($"https://{storageAccountName}.blob.core.windows.net"), credential);
+
                     var blobStorageService = new BlobStorageService(blobServiceClient, blobContainerName);
-                    await blobStorageService.ListAndVerifyBlobsAsync(localDirectory, $"BlobStorageReport_{Path.GetFileName(localDirectory)}.csv");
+                    string reportFileName = $"BlobStorageReport_{Path.GetFileName(localDirectory)}.csv";
+
+                    await blobStorageService.ListAndVerifyBlobsAsync(localDirectory, reportFileName);
                 }
-                catch (Exception ex)
+                else if (choice == "2")
                 {
-                    Console.WriteLine($"Error connecting to Blob Storage: {ex.Message}");
+                    // File Share
+                    Console.Write("Enter your Azure File Share Name: ");
+                    string fileShareName = Console.ReadLine() ?? "";
+
+                    Console.WriteLine("Connecting to File Share...");
+                    var shareClientOptions = new ShareClientOptions();
+                    shareClientOptions.AddPolicy(new FileRequestIntentPolicy(), HttpPipelinePosition.PerCall);
+
+                    var fileShareService = new FileShareService(
+                        $"https://{storageAccountName}.file.core.windows.net",
+                        fileShareName,
+                        credential,
+                        shareClientOptions);
+
+                    string reportFileName = $"FileShareReport_{Path.GetFileName(localDirectory)}.csv";
+                    await fileShareService.ListAndVerifyFilesAsync(localDirectory, reportFileName);
+                }
+                else
+                {
+                    Console.WriteLine("Invalid choice. Please restart the application and choose a valid option.");
                 }
             }
-            else if (choice == "2")
+            catch (Exception ex)
             {
-                Console.Write("Enter your Azure File Share Name: ");
-                string fileShareName = Console.ReadLine() ?? "";
-
-                Console.WriteLine("Connecting to File Share...");
-
-                try
-                {
-                    if (string.IsNullOrEmpty(fileShareName))
-                    {
-                        Console.WriteLine("File share name is missing. Please check your input.");
-                        return;
-                    }
-
-                    // Initialize ShareServiceClient with ClientCertificateCredential
-                    string fileShareUri = $"https://{storageAccountName}.file.core.windows.net";
-                    var shareServiceClient = new ShareServiceClient(new Uri(fileShareUri), clientCertificateCredential);
-                    var shareClient = shareServiceClient.GetShareClient(fileShareName);
-
-                    var fileShareService = new FileShareService(shareClient);
-                    await fileShareService.ListAndVerifyFilesAsync(localDirectory, $"FileShareReport_{Path.GetFileName(localDirectory)}.csv");
-                }
-                catch (UriFormatException uriEx)
-                {
-                    Console.WriteLine($"Invalid URI format: {uriEx.Message}");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error connecting to File Share: {ex.Message}");
-                }
-            }
-            else
-            {
-                Console.WriteLine("Invalid choice. Please restart the application and choose a valid option.");
+                Console.WriteLine($"Error: {ex.Message}");
             }
 
-            // Keep the console open
             Console.WriteLine("Press Enter to exit the application...");
             Console.ReadLine();
         }
@@ -128,32 +149,36 @@ namespace AzureStorageManager
             Console.WriteLine("        Azure Storage Manager Tool      ");
             Console.WriteLine("=======================================");
             Console.WriteLine();
-            Console.WriteLine("Welcome to the Azure Storage Manager Tool!");
             Console.WriteLine("This tool helps you verify file integrity by comparing local files with those stored in Azure.");
-            Console.WriteLine("It checks that files in Azure Blob Storage or File Shares match your local copies, ensuring data accuracy.");
-            Console.WriteLine();
-            Console.WriteLine("When should you run this tool?");
-            Console.WriteLine("- After uploading files to Azure Storage, to confirm successful uploads.");
-            Console.WriteLine("- Periodically, to ensure ongoing data integrity and detect any unexpected changes.");
-            Console.WriteLine("- After restoring files from Azure, as part of a disaster recovery or backup validation process.");
-            Console.WriteLine("- When migrating files within or between storage accounts, to confirm files were migrated accurately.");
-            Console.WriteLine();
-            Console.WriteLine("Requirements:");
-            Console.WriteLine("- Azure Storage Account Name");
-            Console.WriteLine("- Name of the Blob Container or File Share to be verified");
-            Console.WriteLine("- Local directory path containing the original files for comparison");
+            Console.WriteLine("It checks that files in Azure Blob Storage or File Shares match your local copies.");
             Console.WriteLine();
             Console.WriteLine("How to Use:");
-            Console.WriteLine("1. Enter your Azure Storage Account name when prompted.");
+            Console.WriteLine("1. Enter your Azure Storage Account name.");
             Console.WriteLine("2. Choose the storage type (Blob or File Share) and specify the container/share name.");
             Console.WriteLine("3. Enter the local directory path where your files are stored.");
-            Console.WriteLine("The tool will compare each file's MD5 hash with the stored hash in Azure, and");
+            Console.WriteLine("The tool will compare each file's MD5 hash with the stored hash in Azure and");
             Console.WriteLine("generate a report showing any mismatches.");
             Console.WriteLine();
             Console.WriteLine("=======================================");
             Console.WriteLine("       Starting Azure Storage Manager... ");
             Console.WriteLine("=======================================");
             Console.WriteLine();
+        }
+    }
+
+    // Custom policy to add x-ms-file-request-intent header to file share requests
+    internal class FileRequestIntentPolicy : HttpPipelinePolicy
+    {
+        public override void Process(HttpMessage message, ReadOnlyMemory<HttpPipelinePolicy> pipeline)
+        {
+            message.Request.Headers.Add("x-ms-file-request-intent", "backup");
+            ProcessNext(message, pipeline);
+        }
+
+        public override ValueTask ProcessAsync(HttpMessage message, ReadOnlyMemory<HttpPipelinePolicy> pipeline)
+        {
+            message.Request.Headers.Add("x-ms-file-request-intent", "backup");
+            return ProcessNextAsync(message, pipeline);
         }
     }
 }

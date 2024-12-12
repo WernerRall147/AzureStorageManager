@@ -425,3 +425,12 @@ C:\Users\weral\Git\AzureStorageManager\obj\Release\net9.0-windows\win-x64\refint
 C:\Users\weral\Git\AzureStorageManager\obj\Release\net9.0-windows\win-x64\AzureStorageManager.pdb
 C:\Users\weral\Git\AzureStorageManager\obj\Release\net9.0-windows\win-x64\AzureStorageManager.genruntimeconfig.cache
 C:\Users\weral\Git\AzureStorageManager\obj\Release\net9.0-windows\win-x64\ref\AzureStorageManager.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\win-x64\Microsoft.Extensions.Configuration.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\win-x64\Microsoft.Extensions.Configuration.Abstractions.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\win-x64\Microsoft.Extensions.Configuration.EnvironmentVariables.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\win-x64\Microsoft.Extensions.Configuration.FileExtensions.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\win-x64\Microsoft.Extensions.Configuration.Json.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\win-x64\Microsoft.Extensions.FileProviders.Abstractions.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\win-x64\Microsoft.Extensions.FileProviders.Physical.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\win-x64\Microsoft.Extensions.FileSystemGlobbing.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\win-x64\Microsoft.Extensions.Primitives.dll
