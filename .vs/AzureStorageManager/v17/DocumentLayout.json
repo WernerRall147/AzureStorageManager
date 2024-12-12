@@ -3,12 +3,12 @@
   "WorkspaceRootPath": "C:\\Users\\weral\\Git\\AzureStorageManager\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{0CD0416D-302B-4F3C-A72B-D20D3CC43B77}|AzureStorageManager.csproj|c:\\users\\weral\\git\\azurestoragemanager\\services\\fileshareservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{0CD0416D-302B-4F3C-A72B-D20D3CC43B77}|AzureStorageManager.csproj|solutionrelative:services\\fileshareservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{0CD0416D-302B-4F3C-A72B-D20D3CC43B77}|AzureStorageManager.csproj|c:\\users\\weral\\git\\azurestoragemanager\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0CD0416D-302B-4F3C-A72B-D20D3CC43B77}|AzureStorageManager.csproj|solutionrelative:program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{0CD0416D-302B-4F3C-A72B-D20D3CC43B77}|AzureStorageManager.csproj|c:\\users\\weral\\git\\azurestoragemanager\\services\\blobstorageservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{0CD0416D-302B-4F3C-A72B-D20D3CC43B77}|AzureStorageManager.csproj|solutionrelative:services\\blobstorageservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{0CD0416D-302B-4F3C-A72B-D20D3CC43B77}|AzureStorageManager.csproj|c:\\users\\weral\\git\\azurestoragemanager\\services\\fileshareservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0CD0416D-302B-4F3C-A72B-D20D3CC43B77}|AzureStorageManager.csproj|solutionrelative:services\\fileshareservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -18,41 +18,48 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 2,
+          "SelectedChildIndex": 5,
           "Children": [
             {
-              "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "BlobStorageService.cs",
-              "DocumentMoniker": "C:\\Users\\weral\\Git\\AzureStorageManager\\Services\\BlobStorageService.cs",
-              "RelativeDocumentMoniker": "Services\\BlobStorageService.cs",
-              "ToolTip": "C:\\Users\\weral\\Git\\AzureStorageManager\\Services\\BlobStorageService.cs",
-              "RelativeToolTip": "Services\\BlobStorageService.cs",
-              "ViewState": "AgIAACQAAAAAAAAAAAAwwDIAAAARAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2024-11-12T14:57:09.615Z",
-              "EditorCaption": ""
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{1c4feeaa-4718-4aa9-859d-94ce25d182ba}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{d78612c7-9962-4b83-95d9-268046dad23a}"
             },
             {
               "$type": "Bookmark",
               "Name": "ST:129:0:{1fc202d4-d401-403c-9834-5b218574bb67}"
             },
             {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{40ea2e6b-2121-4bb8-a43e-c83c04b51041}"
+            },
+            {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 1,
               "Title": "FileShareService.cs",
               "DocumentMoniker": "C:\\Users\\weral\\Git\\AzureStorageManager\\Services\\FileShareService.cs",
               "RelativeDocumentMoniker": "Services\\FileShareService.cs",
               "ToolTip": "C:\\Users\\weral\\Git\\AzureStorageManager\\Services\\FileShareService.cs",
               "RelativeToolTip": "Services\\FileShareService.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAADUAAAARAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAADYAAAAkAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2024-11-12T14:52:07.81Z",
-              "EditorCaption": ""
+              "WhenOpened": "2024-12-09T10:38:43.943Z"
             },
             {
-              "$type": "Bookmark",
-              "Name": "ST:0:0:{d78612c7-9962-4b83-95d9-268046dad23a}"
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "Program.cs",
+              "DocumentMoniker": "C:\\Users\\weral\\Git\\AzureStorageManager\\Program.cs",
+              "RelativeDocumentMoniker": "Program.cs",
+              "ToolTip": "C:\\Users\\weral\\Git\\AzureStorageManager\\Program.cs",
+              "RelativeToolTip": "Program.cs",
+              "ViewState": "AgIAAAsAAAAAAAAAAAAqwBMAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2024-12-09T10:33:20.093Z",
+              "EditorCaption": ""
             }
           ]
         }
