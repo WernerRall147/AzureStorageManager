@@ -10,3 +10,43 @@ C:\Users\weral\OneDrive - Microsoft\2.1 Client Profiles\43. Nedbank\388 Nedbank 
 C:\Users\weral\OneDrive - Microsoft\2.1 Client Profiles\43. Nedbank\388 Nedbank Storage Request - Discuss Azure Storage Explorer\DotNet\AzureStorageManager\obj\Release\net9.0-windows\refint\AzureStorageManager.dll
 C:\Users\weral\OneDrive - Microsoft\2.1 Client Profiles\43. Nedbank\388 Nedbank Storage Request - Discuss Azure Storage Explorer\DotNet\AzureStorageManager\obj\Release\net9.0-windows\AzureStorageManager.pdb
 C:\Users\weral\OneDrive - Microsoft\2.1 Client Profiles\43. Nedbank\388 Nedbank Storage Request - Discuss Azure Storage Explorer\DotNet\AzureStorageManager\obj\Release\net9.0-windows\ref\AzureStorageManager.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\AzureStorageManager.exe
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\AzureStorageManager.deps.json
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\AzureStorageManager.runtimeconfig.json
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\AzureStorageManager.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\AzureStorageManager.pdb
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\Azure.Core.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\Azure.Identity.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\Azure.Storage.Blobs.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\Azure.Storage.Common.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\Azure.Storage.Files.Shares.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\Microsoft.Bcl.AsyncInterfaces.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\Microsoft.Extensions.Configuration.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\Microsoft.Extensions.Configuration.Abstractions.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\Microsoft.Extensions.Configuration.EnvironmentVariables.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\Microsoft.Extensions.Configuration.FileExtensions.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\Microsoft.Extensions.Configuration.Json.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\Microsoft.Extensions.FileProviders.Abstractions.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\Microsoft.Extensions.FileProviders.Physical.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\Microsoft.Extensions.FileSystemGlobbing.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\Microsoft.Extensions.Primitives.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\Microsoft.Identity.Client.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\Microsoft.Identity.Client.Extensions.Msal.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\Microsoft.IdentityModel.Abstractions.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\System.ClientModel.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\System.IO.Hashing.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\System.Memory.Data.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\System.Security.Cryptography.ProtectedData.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\runtimes\win\lib\netstandard2.0\System.Security.Cryptography.ProtectedData.dll
+C:\Users\weral\Git\AzureStorageManager\obj\Release\net9.0-windows\AzureStorageManager.csproj.AssemblyReference.cache
+C:\Users\weral\Git\AzureStorageManager\obj\Release\net9.0-windows\AzureStorageManager.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\weral\Git\AzureStorageManager\obj\Release\net9.0-windows\AzureStorageManager.AssemblyInfoInputs.cache
+C:\Users\weral\Git\AzureStorageManager\obj\Release\net9.0-windows\AzureStorageManager.AssemblyInfo.cs
+C:\Users\weral\Git\AzureStorageManager\obj\Release\net9.0-windows\AzureStorageManager.csproj.CoreCompileInputs.cache
+C:\Users\weral\Git\AzureStorageManager\obj\Release\net9.0-windows\AzureStorageManager.sourcelink.json
+C:\Users\weral\Git\AzureStorageManager\obj\Release\net9.0-windows\AzureSto.EF36A3F6.Up2Date
+C:\Users\weral\Git\AzureStorageManager\obj\Release\net9.0-windows\AzureStorageManager.dll
+C:\Users\weral\Git\AzureStorageManager\obj\Release\net9.0-windows\refint\AzureStorageManager.dll
+C:\Users\weral\Git\AzureStorageManager\obj\Release\net9.0-windows\AzureStorageManager.pdb
+C:\Users\weral\Git\AzureStorageManager\obj\Release\net9.0-windows\AzureStorageManager.genruntimeconfig.cache
+C:\Users\weral\Git\AzureStorageManager\obj\Release\net9.0-windows\ref\AzureStorageManager.dll

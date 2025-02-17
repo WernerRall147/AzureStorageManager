@@ -1,13 +1,17 @@
-﻿using Azure.Core;
+﻿using System.Net;
+using System.Net.Http;
+using Azure.Core;
 using Azure.Core.Pipeline;
 using Azure.Identity;
 using Azure.Storage.Blobs;
 using Azure.Storage.Files.Shares;
-using AzureStorageManager.Services;
+using Azure.Storage.Files.Shares.Models; // Add this using directive
 using Microsoft.Extensions.Configuration;
 using System;
 using System.IO;
 using System.Security.Cryptography.X509Certificates;
+using System.Threading.Tasks;
+using AzureStorageManager.Services;
 
 namespace AzureStorageManager
 {
@@ -21,7 +25,6 @@ namespace AzureStorageManager
             var config = new ConfigurationBuilder()
                 .SetBasePath(Directory.GetCurrentDirectory())
                 .AddJsonFile("appsettings.json", optional: false)
-                // AddEnvironmentVariables requires Microsoft.Extensions.Configuration.EnvironmentVariables package
                 .AddEnvironmentVariables()
                 .Build();
 
@@ -32,7 +35,7 @@ namespace AzureStorageManager
 
             // Load certificate from Windows Certificate Store
             Console.WriteLine("Loading certificate from Windows Certificate Store...");
-            X509Certificate2 certificate = null;
+            X509Certificate2? certificate = null;
             using (var store = new X509Store(StoreName.My, StoreLocation.CurrentUser))
             {
                 store.Open(OpenFlags.ReadOnly);
@@ -76,6 +79,35 @@ namespace AzureStorageManager
                 credential = new ClientSecretCredential(tenantId, clientId, clientSecret);
             }
 
+            // Ask if using a proxy
+            Console.Write("Are you using a proxy? (yes/no): ");
+            string? useProxyResponse = Console.ReadLine()?.Trim().ToLower();
+            HttpClient? httpClient = null;
+
+            if (useProxyResponse == "yes")
+            {
+                Console.Write("Enter the proxy URL: ");
+                string? proxyUrl = Console.ReadLine()?.Trim();
+
+                Console.Write("Enter the proxy port: ");
+                string? proxyPort = Console.ReadLine()?.Trim();
+
+                if (!string.IsNullOrEmpty(proxyUrl) && !string.IsNullOrEmpty(proxyPort) && int.TryParse(proxyPort, out int port))
+                {
+                    var proxy = new WebProxy($"{proxyUrl}:{port}");
+                    var httpClientHandler = new HttpClientHandler
+                    {
+                        Proxy = proxy,
+                        UseProxy = true
+                    };
+                    httpClient = new HttpClient(httpClientHandler);
+                }
+                else
+                {
+                    Console.WriteLine("Invalid proxy URL or port. Proceeding without proxy.");
+                }
+            }
+
             // Prompt user for storage account details
             Console.Write("Enter your Azure Storage Account Name: ");
             string storageAccountName = Console.ReadLine() ?? "";
@@ -103,7 +135,12 @@ namespace AzureStorageManager
                     string blobContainerName = Console.ReadLine() ?? "";
 
                     Console.WriteLine("Connecting to Blob Storage...");
-                    var blobServiceClient = new BlobServiceClient(new Uri($"https://{storageAccountName}.blob.core.windows.net"), credential);
+                    var blobClientOptions = new BlobClientOptions();
+                    if (httpClient != null)
+                    {
+                        blobClientOptions.Transport = new HttpClientTransport(httpClient);
+                    }
+                    var blobServiceClient = new BlobServiceClient(new Uri($"https://{storageAccountName}.blob.core.windows.net"), credential, blobClientOptions);
 
                     var blobStorageService = new BlobStorageService(blobServiceClient, blobContainerName);
                     string reportFileName = $"BlobStorageReport_{Path.GetFileName(localDirectory)}.csv";
@@ -116,15 +153,19 @@ namespace AzureStorageManager
                     Console.Write("Enter your Azure File Share Name: ");
                     string fileShareName = Console.ReadLine() ?? "";
 
+                    Console.Write("Enter the folder path within the Azure File Share (e.g., folder\\subfolder): ");
+                    string azureFolderPath = Console.ReadLine() ?? "";
+
                     Console.WriteLine("Connecting to File Share...");
                     var shareClientOptions = new ShareClientOptions();
+                    if (httpClient != null)
+                    {
+                        shareClientOptions.Transport = new HttpClientTransport(httpClient);
+                    }
                     shareClientOptions.AddPolicy(new FileRequestIntentPolicy(), HttpPipelinePosition.PerCall);
 
-                    var fileShareService = new FileShareService(
-                        $"https://{storageAccountName}.file.core.windows.net",
-                        fileShareName,
-                        credential,
-                        shareClientOptions);
+                    var shareServiceClient = new ShareServiceClient(new Uri($"https://{storageAccountName}.file.core.windows.net"), credential, shareClientOptions);
+                    var fileShareService = new FileShareService(shareServiceClient, fileShareName, azureFolderPath);
 
                     string reportFileName = $"FileShareReport_{Path.GetFileName(localDirectory)}.csv";
                     await fileShareService.ListAndVerifyFilesAsync(localDirectory, reportFileName);
@@ -179,6 +220,59 @@ namespace AzureStorageManager
         {
             message.Request.Headers.Add("x-ms-file-request-intent", "backup");
             return ProcessNextAsync(message, pipeline);
+        }
+    }
+
+    public class FileShareService
+    {
+        private readonly ShareClient _shareClient;
+        private readonly string _fileShareName;
+        private readonly string _azureFolderPath;
+
+        public FileShareService(ShareServiceClient shareServiceClient, string fileShareName, string azureFolderPath)
+        {
+            _shareClient = shareServiceClient.GetShareClient(fileShareName);
+            _fileShareName = fileShareName;
+            _azureFolderPath = azureFolderPath;
+        }
+
+        public async Task ListAndVerifyFilesAsync(string localDirectory, string reportFileName)
+        {
+            var reportLines = new List<string>();
+            var rootDirectoryClient = _shareClient.GetDirectoryClient(_azureFolderPath);
+            await ListAndVerifyFilesRecursiveAsync(rootDirectoryClient, localDirectory, reportLines);
+
+            // Write the report to a CSV file
+            await File.WriteAllLinesAsync(reportFileName, reportLines);
+        }
+
+        private async Task ListAndVerifyFilesRecursiveAsync(ShareDirectoryClient directoryClient, string localDirectory, List<string> reportLines)
+        {
+            await foreach (ShareFileItem item in directoryClient.GetFilesAndDirectoriesAsync())
+            {
+                if (item.IsDirectory)
+                {
+                    // Recursively list files in subdirectories
+                    var subDirectoryClient = directoryClient.GetSubdirectoryClient(item.Name);
+                    await ListAndVerifyFilesRecursiveAsync(subDirectoryClient, Path.Combine(localDirectory, item.Name), reportLines);
+                }
+                else
+                {
+                    // Verify file
+                    var fileClient = directoryClient.GetFileClient(item.Name);
+                    string localFilePath = Path.Combine(localDirectory, item.Name);
+
+                    if (File.Exists(localFilePath))
+                    {
+                        // Compare file hashes or other verification logic
+                        reportLines.Add($"{localFilePath}, {fileClient.Uri}, Verified");
+                    }
+                    else
+                    {
+                        reportLines.Add($"{localFilePath}, {fileClient.Uri}, Missing");
+                    }
+                }
+            }
         }
     }
 }

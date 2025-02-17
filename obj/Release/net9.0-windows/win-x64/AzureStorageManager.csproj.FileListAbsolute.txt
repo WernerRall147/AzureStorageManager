@@ -409,7 +409,6 @@ C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\win-x64\create
 C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\win-x64\hostfxr.dll
 C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\win-x64\hostpolicy.dll
 C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\win-x64\mscordaccore.dll
-C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\win-x64\mscordaccore_amd64_amd64_9.0.24.47305.dll
 C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\win-x64\mscordbi.dll
 C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\win-x64\mscorrc.dll
 C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\win-x64\msquic.dll
@@ -434,3 +433,4 @@ C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\win-x64\Micros
 C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\win-x64\Microsoft.Extensions.FileProviders.Physical.dll
 C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\win-x64\Microsoft.Extensions.FileSystemGlobbing.dll
 C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\win-x64\Microsoft.Extensions.Primitives.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\win-x64\mscordaccore_amd64_amd64_9.0.24.52809.dll

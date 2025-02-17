@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "ph6zwBpUGpM=",
+  "dgSpecHash": "OpvSsolAwMA=",
   "success": true,
   "projectFilePath": "C:\\Users\\weral\\Git\\AzureStorageManager\\AzureStorageManager.csproj",
   "expectedPackageFiles": [
@@ -22,7 +22,6 @@
     "C:\\Users\\weral\\.nuget\\packages\\microsoft.identity.client\\4.66.1\\microsoft.identity.client.4.66.1.nupkg.sha512",
     "C:\\Users\\weral\\.nuget\\packages\\microsoft.identity.client.extensions.msal\\4.66.1\\microsoft.identity.client.extensions.msal.4.66.1.nupkg.sha512",
     "C:\\Users\\weral\\.nuget\\packages\\microsoft.identitymodel.abstractions\\6.35.0\\microsoft.identitymodel.abstractions.6.35.0.nupkg.sha512",
-    "C:\\Users\\weral\\.nuget\\packages\\microsoft.net.illink.tasks\\9.0.0-rc.2.24473.5\\microsoft.net.illink.tasks.9.0.0-rc.2.24473.5.nupkg.sha512",
     "C:\\Users\\weral\\.nuget\\packages\\system.clientmodel\\1.1.0\\system.clientmodel.1.1.0.nupkg.sha512",
     "C:\\Users\\weral\\.nuget\\packages\\system.diagnostics.diagnosticsource\\6.0.1\\system.diagnostics.diagnosticsource.6.0.1.nupkg.sha512",
     "C:\\Users\\weral\\.nuget\\packages\\system.io.hashing\\6.0.0\\system.io.hashing.6.0.0.nupkg.sha512",
@@ -33,10 +32,7 @@
     "C:\\Users\\weral\\.nuget\\packages\\system.security.cryptography.protecteddata\\4.5.0\\system.security.cryptography.protecteddata.4.5.0.nupkg.sha512",
     "C:\\Users\\weral\\.nuget\\packages\\system.text.encodings.web\\6.0.0\\system.text.encodings.web.6.0.0.nupkg.sha512",
     "C:\\Users\\weral\\.nuget\\packages\\system.text.json\\6.0.10\\system.text.json.6.0.10.nupkg.sha512",
-    "C:\\Users\\weral\\.nuget\\packages\\system.threading.tasks.extensions\\4.5.4\\system.threading.tasks.extensions.4.5.4.nupkg.sha512",
-    "C:\\Users\\weral\\.nuget\\packages\\microsoft.netcore.app.runtime.win-x64\\9.0.0-rc.2.24473.5\\microsoft.netcore.app.runtime.win-x64.9.0.0-rc.2.24473.5.nupkg.sha512",
-    "C:\\Users\\weral\\.nuget\\packages\\microsoft.windowsdesktop.app.runtime.win-x64\\9.0.0-rc.2.24474.4\\microsoft.windowsdesktop.app.runtime.win-x64.9.0.0-rc.2.24474.4.nupkg.sha512",
-    "C:\\Users\\weral\\.nuget\\packages\\microsoft.aspnetcore.app.runtime.win-x64\\9.0.0-rc.2.24474.3\\microsoft.aspnetcore.app.runtime.win-x64.9.0.0-rc.2.24474.3.nupkg.sha512"
+    "C:\\Users\\weral\\.nuget\\packages\\system.threading.tasks.extensions\\4.5.4\\system.threading.tasks.extensions.4.5.4.nupkg.sha512"
   ],
   "logs": []
 }
