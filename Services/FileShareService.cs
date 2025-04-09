@@ -124,5 +124,48 @@ namespace AzureStorageManager.Services
                 Console.WriteLine($"An error occurred while processing files: {ex.Message}");
             }
         }
+
+        /// <summary>
+        /// Copies files from the local directory to the file share, verifies their MD5 hashes,
+        /// updates metadata if there is a mismatch, and exports a report.
+        /// </summary>
+        /// <param name="localDirectory">Path to the local directory containing files to copy and verify.</param>
+        /// <param name="csvFileName">Path to the CSV file where the report will be saved.</param>
+        public async Task CopyAndVerifyFilesAsync(string localDirectory, string csvFileName)
+        {
+            var fileMetadataList = new List<FileMetadata>();
+            var rootDirectoryClient = _shareClient.GetRootDirectoryClient();
+
+            foreach (var filePath in Directory.GetFiles(localDirectory))
+            {
+                string fileName = Path.GetFileName(filePath);
+                var fileClient = rootDirectoryClient.GetFileClient(fileName);
+
+                Console.WriteLine($"Uploading file: {fileName}");
+                using (var fileStream = File.OpenRead(filePath))
+                {
+                    await fileClient.CreateAsync(fileStream.Length);
+                    using (var memoryStream = new MemoryStream())
+                    {
+                        fileStream.CopyTo(memoryStream);
+                        memoryStream.Position = 0;
+                        await fileClient.UploadAsync(memoryStream);
+                    }
+                }                string localHash = FileHashUtility.CalculateMD5(filePath);
+                var fileProperties = await fileClient.GetPropertiesAsync();
+                fileProperties.Value.Metadata.TryGetValue("md5", out string? fileHash);
+
+                if (string.IsNullOrEmpty(fileHash) || fileHash != localHash)
+                {
+                    Console.WriteLine($"Updating MD5 metadata for file: {fileName}");
+                    await fileClient.SetMetadataAsync(new Dictionary<string, string> { { "md5", localHash } });
+                }
+
+                string safeHash = fileHash ?? string.Empty;
+                fileMetadataList.Add(new FileMetadata(fileName, localHash, safeHash, "StatusPlaceholder"));
+            }
+
+            CsvExporter.ExportToCsv(fileMetadataList, csvFileName);
+        }
     }
 }

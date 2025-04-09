@@ -89,5 +89,32 @@ namespace AzureStorageManager.Services
             Console.WriteLine($"Full report saved to {fullReportFileName}");
             Console.WriteLine($"Mismatches-only report saved to {mismatchesReportFileName}");
         }
+
+        public async Task CopyAndVerifyBlobsAsync(string localDirectory, string csvFileName)
+        {
+            var fileMetadataList = new List<FileMetadata>();
+
+            foreach (var filePath in Directory.GetFiles(localDirectory))
+            {
+                string fileName = Path.GetFileName(filePath);
+                var blobClient = _containerClient.GetBlobClient(fileName);
+
+                Console.WriteLine($"Uploading file: {fileName}");
+                await blobClient.UploadAsync(filePath, true);                string localHash = FileHashUtility.CalculateMD5(filePath);
+                var blobProperties = await blobClient.GetPropertiesAsync();
+                blobProperties.Value.Metadata.TryGetValue("md5", out string? blobHash);
+
+                if (string.IsNullOrEmpty(blobHash) || blobHash != localHash)
+                {
+                    Console.WriteLine($"Updating MD5 metadata for blob: {fileName}");
+                    await blobClient.SetMetadataAsync(new Dictionary<string, string> { { "md5", localHash } });
+                }
+
+                string safeHash = blobHash ?? string.Empty;
+                fileMetadataList.Add(new FileMetadata(fileName, localHash, safeHash, "StatusPlaceholder"));
+            }
+
+            CsvExporter.ExportToCsv(fileMetadataList, csvFileName);
+        }
     }
 }

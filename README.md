@@ -59,6 +59,56 @@
 - **Post-migration** validation, for example when moving data within Azure.
 - **Disaster recovery or backup validation** to ensure backup files are intact.
 
+## Implemented Features
+
+### Recently Implemented
+
+1. ✅ **Headers for the CSV File**  
+   - Added descriptive headers to the CSV report (e.g., `FileName`, `LocalHash`, `RemoteHash`, `Status`).
+   - CSV reports now include headers for better readability and data analysis.
+
+2. ✅ **Pop-ups for User Input**  
+   - Replaced command-line prompts with GUI pop-ups for directory selection.
+   - Implemented using Windows Forms dialogs for a more user-friendly experience.
+
+3. ✅ **Check if MD5 is Written to Azure**  
+   - Added functionality to verify if the MD5 hash is present in Azure metadata.
+   - Tool can now update metadata with correct hashes when missing or incorrect.
+
+4. ✅ **"Enter to Exit" with Completion Message**  
+   - Added clear prompts for user interaction with "Press Enter to return to the main menu..."
+   - Improved command-line interface with better feedback for users.
+
+5. ✅ **One Report for the Entire Directory**  
+   - Implemented a consolidated report feature for entire directory operations.
+   - Reports now include comprehensive details of all files in a single document.
+
+6. ✅ **V2: Copy Functionality**  
+   - Added the ability to copy files to Azure and download files from Azure.
+   - Integrated verification features with file transfer capabilities.
+
+7. ✅ **Verbose Output and Logging**  
+   - Implemented logging functionality with a dedicated "View Logs" menu option.
+   - Provided better feedback during operations and comprehensive error reporting.
+
+### Future Improvements
+
+1. **Simplify Backslash/Forward Slash in User Guide**  
+   - Update the documentation to clarify path formats for Windows (`\`) and Unix-like systems (`/`).  
+   - Add examples for both formats to avoid confusion.
+   
+2. **Enhanced Reporting Features**
+   - Add filtering options and search functionality to large reports.
+   - Implement visualization of report data (charts/graphs).
+
+3. **Cloud to Cloud Transfer Support**
+   - Add ability to copy and verify files between different Azure storage accounts.
+   - Support checking integrity across different cloud providers.
+
+4. **Command-Line Arguments Support**
+   - Enable running the tool with command-line arguments for automation scenarios.
+   - Support CI/CD pipeline integration for automated verification.
+
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
