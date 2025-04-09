@@ -36,8 +36,6 @@ C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\Microsoft.Iden
 C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\System.ClientModel.dll
 C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\System.IO.Hashing.dll
 C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\System.Memory.Data.dll
-C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\System.Security.Cryptography.ProtectedData.dll
-C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\runtimes\win\lib\netstandard2.0\System.Security.Cryptography.ProtectedData.dll
 C:\Users\weral\Git\AzureStorageManager\obj\Release\net9.0-windows\AzureStorageManager.csproj.AssemblyReference.cache
 C:\Users\weral\Git\AzureStorageManager\obj\Release\net9.0-windows\AzureStorageManager.GeneratedMSBuildEditorConfig.editorconfig
 C:\Users\weral\Git\AzureStorageManager\obj\Release\net9.0-windows\AzureStorageManager.AssemblyInfoInputs.cache

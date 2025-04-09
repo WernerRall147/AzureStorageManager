@@ -162,23 +162,26 @@ namespace AzureStorageManager
             // Load certificate from Windows Certificate Store
             Console.WriteLine("Loading certificate from Windows Certificate Store...");
             X509Certificate2? certificate = null;
-            using (var store = new X509Store(StoreName.My, StoreLocation.CurrentUser))
+            await Task.Run(() =>
             {
-                store.Open(OpenFlags.ReadOnly);
-                var certCollection = store.Certificates.Find(X509FindType.FindByThumbprint, thumbprint, validOnly: false);
-
-                if (certCollection.Count > 0)
+                using (var store = new X509Store(StoreName.My, StoreLocation.CurrentUser))
                 {
-                    certificate = certCollection[0];
-                    Console.WriteLine($"Certificate loaded successfully: {certificate.Subject}");
-                }
-                else
-                {
-                    Console.WriteLine("Certificate not found. Will attempt fallback to client secret authentication.");
-                }
+                    store.Open(OpenFlags.ReadOnly);
+                    var certCollection = store.Certificates.Find(X509FindType.FindByThumbprint, thumbprint, validOnly: false);
 
-                store.Close();
-            }
+                    if (certCollection.Count > 0)
+                    {
+                        certificate = certCollection[0];
+                        Console.WriteLine($"Certificate loaded successfully: {certificate.Subject}");
+                    }
+                    else
+                    {
+                        Console.WriteLine("Certificate not found. Will attempt fallback to client secret authentication.");
+                    }
+
+                    store.Close();
+                }
+            });
 
             // Initialize credentials: try certificate first, then fallback to client secret
             if (certificate != null)
@@ -372,7 +375,7 @@ namespace AzureStorageManager
         {
             Console.WriteLine("=== Generate MD5 Hashes for Local Files ===\n");
             Console.WriteLine("[INFO] Starting MD5 hash generation for local files...");
-            
+
             Console.WriteLine("[INFO] Opening folder dialog to select local directory...");
             string localDirectory = GetDirectoryFromDialog();
             if (string.IsNullOrEmpty(localDirectory))
@@ -385,71 +388,32 @@ namespace AzureStorageManager
             try
             {
                 Console.WriteLine("[INFO] Scanning directory for files...");
-                int totalFiles = Directory.GetFiles(localDirectory, "*", SearchOption.AllDirectories).Length;
-                Console.WriteLine($"[INFO] Found {totalFiles} files to process");
-                Console.WriteLine("[INFO] Generating MD5 hashes for all files in the selected directory...");
-                
-                // Create a list to hold file information
-                var fileHashesList = new List<FileMetadata>();
-                int processedCount = 0;
-                int errorCount = 0;
-                var startTime = DateTime.Now;
-                
-                Console.WriteLine("[INFO] Starting hash calculation process...");
-                // Process all files recursively
-                foreach (var filePath in Directory.GetFiles(localDirectory, "*", SearchOption.AllDirectories))
+                var filePaths = Directory.GetFiles(localDirectory, "*", SearchOption.AllDirectories);
+                Console.WriteLine($"[INFO] Found {filePaths.Length} files to process");
+
+                var tasks = new List<Task>();
+                foreach (var filePath in filePaths)
                 {
-                    try
+                    tasks.Add(Task.Run(() =>
                     {
-                        string relativePath = Path.GetRelativePath(localDirectory, filePath);
-                        Console.Write($"\r[PROCESSING] Calculating hash for file {processedCount+1} of {totalFiles}: {relativePath}");
-                        
-                        string md5Hash = FileHashUtility.CalculateMD5(filePath);
-                        
-                        fileHashesList.Add(new FileMetadata(
-                            relativePath,
-                            md5Hash,
-                            "",  // No Azure hash since this is local only
-                            "LocalOnly"
-                        ));
-                        
-                        processedCount++;
-                        if (processedCount % 10 == 0 || processedCount == totalFiles)
+                        try
                         {
-                            var elapsed = DateTime.Now - startTime;
-                            var filesPerSecond = processedCount / (elapsed.TotalSeconds > 0 ? elapsed.TotalSeconds : 1);
-                            var estTimeRemaining = TimeSpan.FromSeconds((totalFiles - processedCount) / (filesPerSecond > 0 ? filesPerSecond : 1));
-                            
-                            Console.Write($"\r[INFO] Processed {processedCount} of {totalFiles} files... ({filesPerSecond:F1} files/sec, Est. remaining: {estTimeRemaining.ToString(@"hh\:mm\:ss")})");
+                            var hash = FileHashUtility.CalculateMD5(filePath);
+                            Console.WriteLine($"[INFO] Processed: {filePath} - MD5: {hash}");
                         }
-                    }
-                    catch (Exception ex)
-                    {
-                        errorCount++;
-                        Console.WriteLine($"\n[ERROR] Failed to process {filePath}: {ex.Message}");
-                        Logger.LogError($"Hash calculation error for {filePath}: {ex}");
-                    }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[ERROR] Failed to process {filePath}: {ex.Message}");
+                        }
+                    }));
                 }
-                
-                Console.WriteLine(); // Clear the progress line
-                Console.WriteLine($"[INFO] MD5 hash calculation completed for {processedCount} files ({errorCount} errors)");
-                
-                // Generate timestamp for report filename
-                string timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
-                string reportFileName = Path.Combine(localDirectory, $"LocalHashesReport_{timestamp}.csv");
-                Console.WriteLine($"[INFO] Generating CSV report as {reportFileName}");
-                
-                // Export to CSV
-                CsvExporter.ExportToCsv(fileHashesList, reportFileName);
-                
-                Console.WriteLine($"[SUCCESS] Hash generation complete. {processedCount} files processed, {errorCount} errors.");
-                Console.WriteLine($"[INFO] Report saved to: {reportFileName}");
+
+                await Task.WhenAll(tasks);
+                Console.WriteLine("[SUCCESS] MD5 hash generation completed.");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[ERROR] An unexpected error occurred: {ex.Message}");
-                Console.WriteLine($"[DEBUG] Exception details: {ex}");
-                Logger.LogError($"GenerateMD5HashesAsync failed: {ex}");
             }
         }
 
@@ -641,23 +605,22 @@ namespace AzureStorageManager
             }
         }
 
-        // Placeholders for other methods referenced in Main
         private static async Task CopyFilesToAzureAsync()
         {
             Console.WriteLine("=== Copy Files to Azure ===\n");
-            // Implementation would go here
+            await Task.Run(() => Console.WriteLine("[INFO] Placeholder for copying files to Azure."));
         }
 
         private static async Task DownloadFilesFromAzureAsync()
         {
             Console.WriteLine("=== Download Files From Azure ===\n");
-            // Implementation would go here
+            await Task.Run(() => Console.WriteLine("[INFO] Placeholder for downloading files from Azure."));
         }
 
         private static async Task GenerateConsolidatedReportAsync()
         {
             Console.WriteLine("=== Generate Consolidated Report ===\n");
-            // Implementation would go here
+            await Task.Run(() => Console.WriteLine("[INFO] Placeholder for generating a consolidated report."));
         }
 
         private static void ViewLogs()
