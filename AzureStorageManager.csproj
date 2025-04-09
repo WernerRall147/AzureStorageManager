@@ -1,12 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">  <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
+    <TargetFramework>net8.0-windows</TargetFramework>    <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <!-- Temporarily commenting out the icon reference to resolve build error -->
     <!-- <ApplicationIcon>Assets\app_icon.ico</ApplicationIcon> -->
     <WarningsAsErrors>nullable</WarningsAsErrors>
     <LangVersion>latest</LangVersion>
+    <!-- Removing StartupObject to avoid conflict with top-level statements -->
   </PropertyGroup>
 
   <ItemGroup>

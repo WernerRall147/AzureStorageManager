@@ -1,0 +1,94 @@
+// Backing up current Program.cs before making changes
+using System.Net;
+using System.Net.Http;
+using Azure.Core;
+using Azure.Core.Pipeline;
+using Azure.Identity;
+using Azure.Storage.Blobs;
+using Azure.Storage.Files.Shares;
+using Azure.Storage.Files.Shares.Models; 
+using Microsoft.Extensions.Configuration;
+using System;
+using System.IO;
+using System.Security.Cryptography.X509Certificates;
+using System.Threading.Tasks;
+using AzureStorageManager.Services;
+using AzureStorageManager.Models;
+using AzureStorageManager.Utilities;
+using System.Windows.Forms;
+using System.Collections.Generic;
+
+namespace AzureStorageManager
+{    class Program
+    {
+        private static IConfiguration? _config;
+        private static TokenCredential? _credential;
+        private static HttpClient? _httpClient;
+
+        static async Task Main(string[] args)
+        {
+            // Load configuration
+            _config = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("appsettings.json", optional: false)
+                .AddEnvironmentVariables()
+                .Build();
+
+            bool exitRequested = false;
+
+            while (!exitRequested)
+            {
+                Console.Clear();
+                DisplayMainMenu();
+                
+                string choice = Console.ReadLine()?.Trim() ?? "";
+
+                switch (choice)
+                {
+                    case "1":
+                        await VerifyFileIntegrityAsync();
+                        break;
+                    case "2":
+                        await GenerateMD5HashesAsync();
+                        break;
+                    case "3":
+                        await CheckAndUpdateMetadataAsync();
+                        break;
+                    case "4":
+                        await CopyFilesToAzureAsync();
+                        break;
+                    case "5":
+                        await DownloadFilesFromAzureAsync();
+                        break;
+                    case "6":
+                        await GenerateConsolidatedReportAsync();
+                        break;
+                    case "7":
+                        ViewLogs();
+                        break;
+                    case "8":
+                        ConfigureSettings();
+                        break;
+                    case "9":
+                        DisplayHelp();
+                        break;
+                    case "10":
+                        exitRequested = true;
+                        Console.WriteLine("Exiting the application. Goodbye!");
+                        break;
+                    default:
+                        Console.WriteLine("Invalid choice. Please try again.");
+                        break;
+                }
+
+                if (!exitRequested)
+                {
+                    Console.WriteLine("\nPress Enter to return to the main menu...");
+                    Console.ReadLine();
+                }
+            }
+        }
+
+        // Rest of the class implementation...
+    }
+}
