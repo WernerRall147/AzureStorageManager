@@ -61,7 +61,32 @@
 
 ## Implemented Features
 
-### Recently Implemented
+### Recently Implemented (April 2025 Update)
+
+1. ✅ **Enhanced User Interface**  
+   - Added professional application icon for better visual identity
+   - Implemented ASCII-based spinner animations for improved compatibility with Windows Server environments
+   - Redesigned progress indicators with estimated time remaining and processing rates
+
+2. ✅ **Comprehensive Help System**  
+   - Added detailed in-app help documentation accessible from the main menu
+   - Implemented color-coded help sections for improved readability
+   - Included usage tips and best practices for each feature
+
+3. ✅ **Advanced Settings Menu**  
+   - Implemented a complete settings configuration system
+   - Added customization options for parallel processing, logging levels, and timeouts
+   - Created user-friendly dialogs for all configuration options
+
+4. ✅ **Improved File System Handling**  
+   - Added robust handling of system-restricted folders (e.g., "System Volume Information")
+   - Implemented safe traversal of root directories that prevents permission errors
+   - Enhanced error handling for inaccessible files and directories
+
+5. ✅ **Better Windows Server Compatibility**  
+   - Optimized UI elements for Windows Server v1809 and newer
+   - Fixed thread synchronization issues when displaying dialogs
+   - Added fallback mechanisms for directory selection when GUI dialogs fail
 
 1. ✅ **Headers for the CSV File**  
    - Added descriptive headers to the CSV report (e.g., `FileName`, `LocalHash`, `RemoteHash`, `Status`).
@@ -93,21 +118,40 @@
 
 ### Future Improvements
 
-1. **Simplify Backslash/Forward Slash in User Guide**  
-   - Update the documentation to clarify path formats for Windows (`\`) and Unix-like systems (`/`).  
-   - Add examples for both formats to avoid confusion.
-   
+1. **Multi-platform Support**
+   - Extend compatibility to Linux and macOS environments
+   - Create platform-specific builds while maintaining a consistent user experience
+   - Add Docker container support for cloud-based automation
+
 2. **Enhanced Reporting Features**
-   - Add filtering options and search functionality to large reports.
-   - Implement visualization of report data (charts/graphs).
+   - Add filtering options and search functionality for large reports
+   - Implement visualization of report data with charts/graphs
+   - Add export options for different formats (JSON, Excel, HTML reports)
 
 3. **Cloud to Cloud Transfer Support**
-   - Add ability to copy and verify files between different Azure storage accounts.
-   - Support checking integrity across different cloud providers.
+   - Add ability to copy and verify files between different Azure storage accounts
+   - Support checking integrity across different cloud providers (AWS, GCP)
+   - Implement delta sync to only transfer changed files
 
 4. **Command-Line Arguments Support**
-   - Enable running the tool with command-line arguments for automation scenarios.
-   - Support CI/CD pipeline integration for automated verification.
+   - Enable running the tool with command-line arguments for automation scenarios
+   - Support CI/CD pipeline integration for automated verification
+   - Add batch file processing for unattended operations
+
+5. **Performance Optimizations**
+   - Implement chunked file processing for extremely large datasets
+   - Add resumable operations for interrupted transfers or verifications
+   - Optimize memory usage for resource-constrained environments
+
+6. **Enhanced Security Features**
+   - Add support for Azure Key Vault integration for secure credential management
+   - Implement role-based access control for multi-user environments
+   - Add encryption options for sensitive local data
+
+7. **UI Enhancements**
+   - Create a simple graphical user interface option
+   - Add a web-based dashboard for monitoring long-running operations
+   - Implement real-time notifications for completed operations
 
 ## License
 
