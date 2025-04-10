@@ -10,10 +10,11 @@
 using System;
 using System.Reflection;
 
-[assembly: System.Reflection.AssemblyCompanyAttribute("AzureStorageManager")]
+[assembly: System.Reflection.AssemblyCompanyAttribute("Azure Storage Manager")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
+[assembly: System.Reflection.AssemblyDescriptionAttribute("A tool for managing and verifying Azure Storage files")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ceba16fd50367d1c9843a40cf5f5858b9b381150")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a9235cd3a7bbcb1d992f91ad54f45ba5ed1f0257")]
 [assembly: System.Reflection.AssemblyProductAttribute("AzureStorageManager")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AzureStorageManager")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

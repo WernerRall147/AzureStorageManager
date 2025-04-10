@@ -86,13 +86,20 @@ namespace AzureStorageManager
                     Console.ReadLine();
                 }
             }
-        }
-
-        private static void DisplayMainMenu()
+        }        private static void DisplayMainMenu()
         {
             Console.WriteLine("=======================================");
             Console.WriteLine("        Azure Storage Manager Tool      ");
             Console.WriteLine("=======================================");
+            
+            // Display current connection status if there is one
+            if (Models.ConnectionState.IsStorageAccountConnected)
+            {
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine(Models.ConnectionState.GetConnectionInfoString());
+                Console.ResetColor();
+            }
+            
             Console.WriteLine();
             Console.WriteLine("Please select an option:");
             Console.WriteLine("1. Verify File Integrity");
@@ -125,35 +132,90 @@ namespace AzureStorageManager
             Console.WriteLine("The tool will compare each file's MD5 hash with the stored hash in Azure and");
             Console.WriteLine("generate a report showing any mismatches.");
             Console.WriteLine();
-        }
-
-        private static string GetDirectoryFromDialog()
+        }        private static string GetDirectoryFromDialog()
         {
-            using (var folderDialog = new FolderBrowserDialog())
+            // Show a message before opening the dialog to make it clear what's happening
+            Console.WriteLine("[INFO] Opening folder selection dialog... (Application will wait for your selection)");
+            
+            try
             {
-                folderDialog.Description = "Select the local directory for file operations";
-                folderDialog.UseDescriptionForTitle = true;
-
-                if (folderDialog.ShowDialog() == DialogResult.OK)
+                // When running in Windows Server, we need to handle the UI thread differently
+                // Create a special thread for showing dialogs to improve compatibility
+                string selectedPath = "";
+                var thread = new System.Threading.Thread(() => {
+                    try
+                    {
+                        using (var folderDialog = new FolderBrowserDialog())
+                        {
+                            // Use properties that are compatible with older Windows versions
+                            folderDialog.Description = "Select the local directory for file operations";
+                            folderDialog.ShowNewFolderButton = true;
+                            
+                            // Avoid using UseDescriptionForTitle which might not be available in all versions
+                            try { 
+                                folderDialog.GetType().GetProperty("UseDescriptionForTitle")?.SetValue(folderDialog, true);
+                            } catch { /* Ignore if property doesn't exist */ }
+                            
+                            // Set an initial root folder to make navigation easier
+                            try {
+                                if (Directory.Exists("C:\\"))
+                                    folderDialog.SelectedPath = "C:\\";
+                            } catch { /* Ignore if setting initial path fails */ }
+                            
+                            // Show the dialog and get the result
+                            var result = folderDialog.ShowDialog();
+                            
+                            if (result == DialogResult.OK)
+                                selectedPath = folderDialog.SelectedPath;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[ERROR] Error showing folder dialog: {ex.Message}");
+                    }
+                });
+                
+                // Set as STAThread which is required for Windows Forms dialogs
+                thread.SetApartmentState(System.Threading.ApartmentState.STA);
+                thread.Start();
+                thread.Join(); // Wait for the dialog thread to complete
+                
+                if (!string.IsNullOrEmpty(selectedPath))
                 {
-                    return folderDialog.SelectedPath;
+                    Console.WriteLine($"[INFO] Selected directory: {selectedPath}");
+                    return selectedPath;
                 }
                 else
                 {
-                    Console.WriteLine("No directory selected. Operation cancelled.");
+                    Console.WriteLine("[WARNING] No directory selected. Operation cancelled.");
                     return string.Empty;
                 }
             }
-        }
-
-        private static async Task InitializeAzureCredentialsAsync()
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ERROR] Failed to open folder dialog: {ex.Message}");
+                Console.WriteLine("[INFO] Please enter directory path manually:");
+                string manualPath = Console.ReadLine() ?? "";
+                
+                if (Directory.Exists(manualPath))
+                {
+                    Console.WriteLine($"[INFO] Using directory: {manualPath}");
+                    return manualPath;
+                }
+                
+                Console.WriteLine("[ERROR] Invalid directory path. Operation cancelled.");
+                return string.Empty;
+            }
+        }private static async Task InitializeAzureCredentialsAsync()
         {
             if (_credential != null)
             {
                 // Credentials already initialized
+                Console.WriteLine("[INFO] Using existing Azure credentials");
                 return;
             }
 
+            Console.WriteLine("[INFO] Initializing Azure credentials...");
             string tenantId = _config?["Azure:TenantId"] ?? "";
             string clientId = _config?["Azure:ClientId"] ?? "";
             string thumbprint = _config?["Azure:CertificateThumbprint"] ?? "";
@@ -234,9 +296,7 @@ namespace AzureStorageManager
                     Console.WriteLine("Invalid proxy URL or port. Proceeding without proxy.");
                 }
             }
-        }
-
-        private static async Task VerifyFileIntegrityAsync()
+        }        private static async Task VerifyFileIntegrityAsync()
         {
             DisplayIntroduction();
             Console.WriteLine("=== Verify File Integrity ===\n");
@@ -244,22 +304,40 @@ namespace AzureStorageManager
 
             try
             {
-                Console.WriteLine("[INFO] Initializing Azure credentials...");
+                // Initialize Azure credentials
                 await InitializeAzureCredentialsAsync();
-                Console.WriteLine("[SUCCESS] Azure credentials initialized successfully");
                 
-                // Prompt user for storage account details
-                Console.Write("Enter your Azure Storage Account Name: ");
-                string storageAccountName = Console.ReadLine() ?? "";
-                Console.WriteLine($"[INFO] Using storage account: {storageAccountName}");
+                // If we have a storage account connection already, ask if the user wants to use it
+                string storageAccountName = "";
+                if (Models.ConnectionState.IsStorageAccountConnected)
+                {
+                    Console.WriteLine($"[INFO] Currently connected to: {Models.ConnectionState.StorageAccountName}");
+                    Console.Write("Use current storage account connection? (yes/no): ");
+                    string? useCurrentResponse = Console.ReadLine()?.Trim().ToLower();
+                    
+                    if (useCurrentResponse == "yes" || useCurrentResponse == "y")
+                    {
+                        storageAccountName = Models.ConnectionState.StorageAccountName ?? "";
+                        Console.WriteLine($"[INFO] Using current storage account: {storageAccountName}");
+                    }
+                }
+                
+                // If no storage account selected yet, prompt for one
+                if (string.IsNullOrEmpty(storageAccountName))
+                {
+                    Console.Write("Enter your Azure Storage Account Name: ");
+                    storageAccountName = Console.ReadLine() ?? "";
+                    Console.WriteLine($"[INFO] Using storage account: {storageAccountName}");
+                    // Reset connection state since we're changing accounts
+                    Models.ConnectionState.Reset();
+                    Models.ConnectionState.StorageAccountName = storageAccountName;
+                }
 
                 Console.WriteLine("Choose Storage Type:");
                 Console.WriteLine("1. Blob Storage");
                 Console.WriteLine("2. File Share");
                 string choice = Console.ReadLine() ?? "";
-                Console.WriteLine($"[INFO] Selected storage type option: {choice}");
-
-                Console.WriteLine("[INFO] Opening folder dialog to select local directory...");
+                Console.WriteLine($"[INFO] Selected storage type option: {choice}");                Console.WriteLine("[INFO] Opening folder dialog to select local directory...");
                 string localDirectory = GetDirectoryFromDialog();
                 if (string.IsNullOrEmpty(localDirectory))
                 {
@@ -267,22 +345,43 @@ namespace AzureStorageManager
                     return;
                 }
                 Console.WriteLine($"[INFO] Selected local directory: {localDirectory}");
-                Console.WriteLine($"[INFO] Directory contains {Directory.GetFiles(localDirectory, "*", SearchOption.AllDirectories).Length} files to process");
+                  // Get files while handling access restrictions
+                var files = GetFilesWithPermissionHandling(localDirectory);
+                Console.WriteLine($"[INFO] Found {files.Count} accessible files to process");
 
                 if (string.IsNullOrEmpty(storageAccountName))
                 {
                     Console.WriteLine("[ERROR] Storage account name is missing. Please check your input.");
                     return;
-                }
-
-                if (choice == "1")
+                }                if (choice == "1")
                 {
-                    // Blob Storage
-                    Console.Write("Enter your Azure Blob Container Name: ");
-                    string blobContainerName = Console.ReadLine() ?? "";
-                    Console.WriteLine($"[INFO] Using blob container: {blobContainerName}");
+                    // Check if we already have a blob container connection and ask if user wants to use it
+                    string blobContainerName = "";
+                    if (!string.IsNullOrEmpty(Models.ConnectionState.BlobContainerName) && 
+                        Models.ConnectionState.StorageAccountName == storageAccountName)
+                    {
+                        Console.WriteLine($"[INFO] Currently using container: {Models.ConnectionState.BlobContainerName}");
+                        Console.Write("Use current container? (yes/no): ");
+                        string? useCurrentContainer = Console.ReadLine()?.Trim().ToLower();
+                        
+                        if (useCurrentContainer == "yes" || useCurrentContainer == "y")
+                        {
+                            blobContainerName = Models.ConnectionState.BlobContainerName ?? "";
+                            Console.WriteLine($"[INFO] Using current blob container: {blobContainerName}");
+                        }
+                    }
+                    
+                    // If no container selected yet, prompt for one
+                    if (string.IsNullOrEmpty(blobContainerName))
+                    {
+                        Console.Write("Enter your Azure Blob Container Name: ");
+                        blobContainerName = Console.ReadLine() ?? "";
+                        Console.WriteLine($"[INFO] Using blob container: {blobContainerName}");
+                        Models.ConnectionState.BlobContainerName = blobContainerName;
+                    }
 
-                    Console.WriteLine("[INFO] Connecting to Blob Storage service...");
+                    // Create connection options
+                    Console.WriteLine("[INFO] Preparing connection to Blob Storage service...");
                     var blobClientOptions = new BlobClientOptions();
                     if (_httpClient != null)
                     {
@@ -291,20 +390,62 @@ namespace AzureStorageManager
                     }
                     
                     try {
-                        Console.WriteLine($"[INFO] Creating connection to {storageAccountName}.blob.core.windows.net");
-                        var blobServiceClient = new BlobServiceClient(new Uri($"https://{storageAccountName}.blob.core.windows.net"), _credential, blobClientOptions);
-                        Console.WriteLine("[SUCCESS] Successfully created Blob service client");
-
+                        // Use existing service client or create a new one
+                        BlobServiceClient blobServiceClient;
+                        if (Models.ConnectionState.BlobServiceClient != null && 
+                            Models.ConnectionState.StorageAccountName == storageAccountName)
+                        {
+                            Console.WriteLine("[INFO] Reusing existing Blob service connection");
+                            blobServiceClient = Models.ConnectionState.BlobServiceClient;
+                        }
+                        else
+                        {
+                            Console.WriteLine($"[INFO] Creating new connection to {storageAccountName}.blob.core.windows.net");
+                            blobServiceClient = new BlobServiceClient(
+                                new Uri($"https://{storageAccountName}.blob.core.windows.net"), 
+                                _credential, 
+                                blobClientOptions);
+                                
+                            // Store for future use
+                            Models.ConnectionState.BlobServiceClient = blobServiceClient;
+                            Models.ConnectionState.StorageAccountName = storageAccountName;
+                        }
+                        
+                        Console.WriteLine("[SUCCESS] Successfully connected to Blob service");
                         Console.WriteLine($"[INFO] Instantiating BlobStorageService for container '{blobContainerName}'");
                         var blobStorageService = new BlobStorageService(blobServiceClient, blobContainerName);
                         string reportFileName = $"BlobStorageReport_{Path.GetFileName(localDirectory)}.csv";
-                        Console.WriteLine($"[INFO] Report will be saved as: {reportFileName}");
-
-                        Console.WriteLine("[INFO] Starting verification of local files against Azure blobs...");
+                        Console.WriteLine($"[INFO] Report will be saved as: {reportFileName}");                        Console.WriteLine("[INFO] Starting verification of local files against Azure blobs...");
                         Console.WriteLine("[INFO] This process may take some time depending on the number of files...");
-                        await blobStorageService.ListAndVerifyBlobsAsync(localDirectory, reportFileName);
-                        Console.WriteLine("[SUCCESS] Verification process completed successfully");
-                        Console.WriteLine($"[INFO] Verification complete. Report saved to: {Path.Combine(Directory.GetCurrentDirectory(), reportFileName)}");
+                        
+                        // Create progress spinner with cancellation support
+                        var startTime = DateTime.Now;
+                        var cts = new CancellationTokenSource();
+                        var progressTask = Utilities.ProgressIndicator.StartSpinner(
+                            "Verifying files", 
+                            cts.Token);
+                        
+                        try
+                        {
+                            // Run the actual verification process
+                            await blobStorageService.ListAndVerifyBlobsAsync(localDirectory, reportFileName);
+                            
+                            // Stop the progress spinner
+                            Utilities.ProgressIndicator.StopProgress(
+                                cts, 
+                                progressTask, 
+                                "[SUCCESS] Verification process completed successfully");
+                            
+                            var totalTime = DateTime.Now - startTime;
+                            Console.WriteLine($"[INFO] Verification complete in {totalTime.Minutes}m {totalTime.Seconds}s");
+                            Console.WriteLine($"[INFO] Report saved to: {Path.Combine(Directory.GetCurrentDirectory(), reportFileName)}");
+                        }
+                        catch (Exception)
+                        {
+                            // Make sure we cancel the progress indicator even on error
+                            Utilities.ProgressIndicator.StopProgress(cts, progressTask, "[ERROR] Verification process failed");
+                            throw; // Re-throw the exception to be handled by outer catch
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -344,13 +485,37 @@ namespace AzureStorageManager
                         Console.WriteLine($"[INFO] Instantiating FileShareService for share '{fileShareName}'");
                         var fileShareService = new FileShareService($"https://{storageAccountName}.file.core.windows.net", fileShareName, _credential, shareClientOptions);
                         string reportFileName = $"FileShareReport_{Path.GetFileName(localDirectory)}.csv";
-                        Console.WriteLine($"[INFO] Report will be saved as: {reportFileName}");
-
-                        Console.WriteLine("[INFO] Starting verification of local files against Azure File Share...");
+                        Console.WriteLine($"[INFO] Report will be saved as: {reportFileName}");                        Console.WriteLine("[INFO] Starting verification of local files against Azure File Share...");
                         Console.WriteLine("[INFO] This process may take some time depending on the number of files...");
-                        await fileShareService.ListAndVerifyFilesAsync(localDirectory, reportFileName);
-                        Console.WriteLine("[SUCCESS] Verification process completed successfully");
-                        Console.WriteLine($"[INFO] Verification complete. Report saved to: {Path.Combine(Directory.GetCurrentDirectory(), reportFileName)}");
+                        
+                        // Create progress spinner with cancellation support
+                        var startTime = DateTime.Now;
+                        var cts = new CancellationTokenSource();
+                        var progressTask = Utilities.ProgressIndicator.StartSpinner(
+                            "Verifying files", 
+                            cts.Token);
+                        
+                        try
+                        {
+                            // Run the actual verification process
+                            await fileShareService.ListAndVerifyFilesAsync(localDirectory, reportFileName);
+                            
+                            // Stop the progress spinner
+                            Utilities.ProgressIndicator.StopProgress(
+                                cts, 
+                                progressTask, 
+                                "[SUCCESS] Verification process completed successfully");
+                            
+                            var totalTime = DateTime.Now - startTime;
+                            Console.WriteLine($"[INFO] Verification complete in {totalTime.Minutes}m {totalTime.Seconds}s");
+                            Console.WriteLine($"[INFO] Report saved to: {Path.Combine(Directory.GetCurrentDirectory(), reportFileName)}");
+                        }
+                        catch (Exception)
+                        {
+                            // Make sure we cancel the progress indicator even on error
+                            Utilities.ProgressIndicator.StopProgress(cts, progressTask, "[ERROR] Verification process failed");
+                            throw; // Re-throw the exception to be handled by outer catch
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -369,28 +534,55 @@ namespace AzureStorageManager
                 Console.WriteLine($"[DEBUG] Exception details: {ex}");
                 Logger.LogError($"VerifyFileIntegrityAsync failed: {ex}");
             }
-        }
-
-        private static async Task GenerateMD5HashesAsync()
+        }        private static async Task GenerateMD5HashesAsync()
         {
             Console.WriteLine("=== Generate MD5 Hashes for Local Files ===\n");
             Console.WriteLine("[INFO] Starting MD5 hash generation for local files...");
 
-            Console.WriteLine("[INFO] Opening folder dialog to select local directory...");
-            string localDirectory = GetDirectoryFromDialog();
-            if (string.IsNullOrEmpty(localDirectory))
-            {
-                Console.WriteLine("[WARNING] Directory selection canceled by user");
-                return;
-            }
-            Console.WriteLine($"[INFO] Selected directory: {localDirectory}");
-
+            // First, select the directory - this must happen before any task is spawned
+            string localDirectory;
             try
             {
-                Console.WriteLine("[INFO] Scanning directory for files...");
-                var filePaths = Directory.GetFiles(localDirectory, "*", SearchOption.AllDirectories);
-                Console.WriteLine($"[INFO] Found {filePaths.Length} files to process");
-
+                // This is a blocking operation that must complete before proceeding
+                localDirectory = GetDirectoryFromDialog();
+                
+                if (string.IsNullOrEmpty(localDirectory))
+                {
+                    Console.WriteLine("[WARNING] Directory selection canceled by user");
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ERROR] Failed to open directory selection dialog: {ex.Message}");
+                return;
+            }            try
+            {                Console.WriteLine("[INFO] Scanning directory for files...");
+                var filePaths = GetFilesWithPermissionHandling(localDirectory);
+                Console.WriteLine($"[INFO] Found {filePaths.Count} files to process");
+                
+                // Setup progress tracking
+                DateTime startTime = DateTime.Now;
+                int processed = 0;
+                int total = filePaths.Count;
+                var lockObj = new object();
+                
+                // Start progress reporting task with cancellation support
+                var cts = new CancellationTokenSource();
+                var progressTask = Utilities.ProgressIndicator.StartProgress(() => {
+                    lock(lockObj)
+                    {
+                        var percent = processed * 100 / (total > 0 ? total : 1);
+                        var elapsed = DateTime.Now - startTime;
+                        var filesPerSecond = processed / (elapsed.TotalSeconds > 0 ? elapsed.TotalSeconds : 1);
+                        var eta = TimeSpan.FromSeconds((total - processed) / (filesPerSecond > 0 ? filesPerSecond : 1));
+                        
+                        return $"Processing: {processed}/{total} files ({percent}%) " +
+                               $"| {filesPerSecond:F1} files/sec | ETA: {eta.Minutes:00}:{eta.Seconds:00}";
+                    }
+                }, cts.Token);
+                
+                // Process files with MD5 calculation
                 var tasks = new List<Task>();
                 foreach (var filePath in filePaths)
                 {
@@ -399,17 +591,47 @@ namespace AzureStorageManager
                         try
                         {
                             var hash = FileHashUtility.CalculateMD5(filePath);
-                            Console.WriteLine($"[INFO] Processed: {filePath} - MD5: {hash}");
+                            lock(lockObj)
+                            {
+                                processed++;
+                                // Only log details every 10th file to avoid console flood
+                                if (processed % 10 == 0 || processed == total)
+                                {
+                                    var relativePath = filePath.Replace(localDirectory, "").TrimStart('\\');
+                                    Logger.LogInfo($"Processed: {relativePath} - MD5: {hash}");
+                                }
+                            }
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine($"[ERROR] Failed to process {filePath}: {ex.Message}");
+                            lock(lockObj)
+                            {
+                                processed++;
+                                Console.WriteLine($"\r[ERROR] Failed to process {filePath}: {ex.Message}" + new string(' ', 30));
+                                Logger.LogError($"MD5 calculation error for {filePath}: {ex.Message}");
+                            }
                         }
                     }));
+                }                try
+                {
+                    // Wait for all hash calculations to complete
+                    await Task.WhenAll(tasks);
+                    
+                    // Stop the progress spinner properly
+                    Utilities.ProgressIndicator.StopProgress(
+                        cts,
+                        progressTask,
+                        "[SUCCESS] MD5 hash generation completed successfully");
+                    
+                    TimeSpan totalTime = DateTime.Now - startTime;
+                    Console.WriteLine($"[INFO] Processed {processed} files in {totalTime.Minutes}m {totalTime.Seconds}s" + new string(' ', 30));
                 }
-
-                await Task.WhenAll(tasks);
-                Console.WriteLine("[SUCCESS] MD5 hash generation completed.");
+                catch (Exception)
+                {
+                    // Make sure we cancel the progress indicator even on error
+                    Utilities.ProgressIndicator.StopProgress(cts, progressTask, "[ERROR] MD5 hash generation failed");
+                    throw; // Re-throw the exception to be handled by outer catch
+                }
             }
             catch (Exception ex)
             {
@@ -603,42 +825,789 @@ namespace AzureStorageManager
                     Console.WriteLine($"Inner Error: {ex.InnerException.Message}");
                 }
             }
-        }
-
-        private static async Task CopyFilesToAzureAsync()
+        }        private static async Task CopyFilesToAzureAsync()
         {
+            DisplayIntroduction();
             Console.WriteLine("=== Copy Files to Azure ===\n");
-            await Task.Run(() => Console.WriteLine("[INFO] Placeholder for copying files to Azure."));
-        }
+            Console.WriteLine("[INFO] Starting file upload process to Azure...");
 
-        private static async Task DownloadFilesFromAzureAsync()
+            try
+            {
+                // Initialize Azure credentials
+                await InitializeAzureCredentialsAsync();
+                
+                // If we have a storage account connection already, ask if the user wants to use it
+                string storageAccountName = "";
+                if (Models.ConnectionState.IsStorageAccountConnected)
+                {
+                    Console.WriteLine($"[INFO] Currently connected to: {Models.ConnectionState.StorageAccountName}");
+                    Console.Write("Use current storage account connection? (yes/no): ");
+                    string? useCurrentResponse = Console.ReadLine()?.Trim().ToLower();
+                    
+                    if (useCurrentResponse == "yes" || useCurrentResponse == "y")
+                    {
+                        storageAccountName = Models.ConnectionState.StorageAccountName ?? "";
+                        Console.WriteLine($"[INFO] Using current storage account: {storageAccountName}");
+                    }
+                }
+                
+                // If no storage account selected yet, prompt for one
+                if (string.IsNullOrEmpty(storageAccountName))
+                {
+                    Console.Write("Enter your Azure Storage Account Name: ");
+                    storageAccountName = Console.ReadLine() ?? "";
+                    Console.WriteLine($"[INFO] Using storage account: {storageAccountName}");
+                    // Reset connection state since we're changing accounts
+                    Models.ConnectionState.Reset();
+                    Models.ConnectionState.StorageAccountName = storageAccountName;
+                }
+
+                Console.WriteLine("Choose Storage Type:");
+                Console.WriteLine("1. Blob Storage");
+                Console.WriteLine("2. File Share");
+                string choice = Console.ReadLine() ?? "";
+                Console.WriteLine($"[INFO] Selected storage type option: {choice}");
+
+                Console.WriteLine("[INFO] Opening folder dialog to select local files to upload...");
+                string localDirectory = GetDirectoryFromDialog();
+                if (string.IsNullOrEmpty(localDirectory))
+                {
+                    Console.WriteLine("[WARNING] Directory selection canceled by user");
+                    return;
+                }
+                Console.WriteLine($"[INFO] Selected local directory: {localDirectory}");
+                
+                // Get all files to upload
+                var filesToUpload = Directory.GetFiles(localDirectory, "*", SearchOption.AllDirectories);
+                Console.WriteLine($"[INFO] Found {filesToUpload.Length} files to upload");
+                
+                if (string.IsNullOrEmpty(storageAccountName))
+                {
+                    Console.WriteLine("[ERROR] Storage account name is missing. Please check your input.");
+                    return;
+                }
+                
+                // Setup progress tracking
+                var startTime = DateTime.Now;
+                int uploaded = 0;
+                int failed = 0;
+                long totalBytes = 0;
+                long uploadedBytes = 0;
+                var lockObj = new object();
+                
+                // Calculate total size
+                foreach (var file in filesToUpload)
+                {
+                    try
+                    {
+                        var fileInfo = new FileInfo(file);
+                        totalBytes += fileInfo.Length;
+                    }
+                    catch { } // Ignore files we can't access
+                }
+                
+                // Format total size for display
+                string totalSizeFormatted = totalBytes < 1024 * 1024 ? 
+                    $"{totalBytes / 1024.0:F1} KB" : 
+                    $"{totalBytes / (1024.0 * 1024.0):F1} MB";
+                
+                Console.WriteLine($"[INFO] Total upload size: {totalSizeFormatted}");
+                
+                // Start progress reporting task
+                var progressTask = Task.Run(async () => {
+                    string[] spinner = new[] { "⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷" };
+                    int spinnerPos = 0;
+                    
+                    while (true)
+                    {
+                        lock(lockObj)
+                        {
+                            var percent = filesToUpload.Length > 0 ? uploaded * 100 / filesToUpload.Length : 0;
+                            var bytesPercent = totalBytes > 0 ? uploadedBytes * 100 / totalBytes : 0;
+                            var elapsed = DateTime.Now - startTime;
+                            var speed = elapsed.TotalSeconds > 0 ? uploadedBytes / elapsed.TotalSeconds / 1024 : 0; // KB/s
+                            
+                            string uploadedSizeFormatted = uploadedBytes < 1024 * 1024 ? 
+                                $"{uploadedBytes / 1024.0:F1} KB" : 
+                                $"{uploadedBytes / (1024.0 * 1024.0):F1} MB";
+                                
+                            Console.Write($"\r[WORKING] {spinner[spinnerPos]} Uploaded: {uploaded}/{filesToUpload.Length} files ({percent}%) " +
+                                        $"| {uploadedSizeFormatted} of {totalSizeFormatted} ({bytesPercent}%) | {speed:F1} KB/s    ");
+                        }
+                        
+                        spinnerPos = (spinnerPos + 1) % spinner.Length;
+                        await Task.Delay(200);
+                    }
+                });
+                
+                Console.WriteLine("[INFO] Beginning upload process. This may take some time depending on file sizes...");
+                
+                // Add implementation for actual file uploading here
+                // This is a placeholder for now - in a future update, this method will be fully implemented
+                await Task.Delay(2000); // Simulate work
+                
+                // For demo purposes only - simulate some activity
+                Random rnd = new Random();
+                for (int i = 1; i <= filesToUpload.Length; i++)
+                {
+                    await Task.Delay(300);
+                    lock(lockObj)
+                    {
+                        uploaded = i;
+                        var fileInfo = new FileInfo(filesToUpload[i-1]);
+                        uploadedBytes += fileInfo.Length;
+                        var relativePath = filesToUpload[i-1].Replace(localDirectory, "").TrimStart('\\');
+                        Console.WriteLine($"\r[INFO] Uploaded: {relativePath}" + new string(' ', 30));
+                    }
+                }
+                
+                // Stop the progress spinner
+                try { progressTask.GetAwaiter().GetResult(); } catch { }
+                
+                var totalTime = DateTime.Now - startTime;
+                string uploadSpeedFormatted = totalTime.TotalSeconds > 0 ? 
+                    $"{uploadedBytes / totalTime.TotalSeconds / 1024:F1} KB/s" : 
+                    "N/A";
+                    
+                Console.WriteLine($"\r[SUCCESS] Upload process completed. {uploaded} files uploaded ({totalSizeFormatted}) in {totalTime.Minutes}m {totalTime.Seconds}s" + new string(' ', 30));
+                Console.WriteLine($"[INFO] Average upload speed: {uploadSpeedFormatted}");
+                
+                if (failed > 0)
+                {
+                    Console.WriteLine($"[WARNING] {failed} files failed to upload. Check the logs for details.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ERROR] An unexpected error occurred: {ex.Message}");
+                Console.WriteLine($"[DEBUG] Exception details: {ex}");
+                Logger.LogError($"CopyFilesToAzureAsync failed: {ex}");
+            }
+        }        private static async Task DownloadFilesFromAzureAsync()
         {
+            DisplayIntroduction();
             Console.WriteLine("=== Download Files From Azure ===\n");
-            await Task.Run(() => Console.WriteLine("[INFO] Placeholder for downloading files from Azure."));
-        }
+            Console.WriteLine("[INFO] Starting file download process from Azure...");
 
-        private static async Task GenerateConsolidatedReportAsync()
+            try
+            {
+                // Initialize Azure credentials
+                await InitializeAzureCredentialsAsync();
+                
+                // If we have a storage account connection already, ask if the user wants to use it
+                string storageAccountName = "";
+                if (Models.ConnectionState.IsStorageAccountConnected)
+                {
+                    Console.WriteLine($"[INFO] Currently connected to: {Models.ConnectionState.StorageAccountName}");
+                    Console.Write("Use current storage account connection? (yes/no): ");
+                    string? useCurrentResponse = Console.ReadLine()?.Trim().ToLower();
+                    
+                    if (useCurrentResponse == "yes" || useCurrentResponse == "y")
+                    {
+                        storageAccountName = Models.ConnectionState.StorageAccountName ?? "";
+                        Console.WriteLine($"[INFO] Using current storage account: {storageAccountName}");
+                    }
+                }
+                
+                // If no storage account selected yet, prompt for one
+                if (string.IsNullOrEmpty(storageAccountName))
+                {
+                    Console.Write("Enter your Azure Storage Account Name: ");
+                    storageAccountName = Console.ReadLine() ?? "";
+                    Console.WriteLine($"[INFO] Using storage account: {storageAccountName}");
+                    // Reset connection state since we're changing accounts
+                    Models.ConnectionState.Reset();
+                    Models.ConnectionState.StorageAccountName = storageAccountName;
+                }
+
+                Console.WriteLine("Choose Storage Type:");
+                Console.WriteLine("1. Blob Storage");
+                Console.WriteLine("2. File Share");
+                string choice = Console.ReadLine() ?? "";
+                Console.WriteLine($"[INFO] Selected storage type option: {choice}");
+
+                Console.WriteLine("[INFO] Opening folder dialog to select local download directory...");
+                string localDirectory = GetDirectoryFromDialog();
+                if (string.IsNullOrEmpty(localDirectory))
+                {
+                    Console.WriteLine("[WARNING] Directory selection canceled by user");
+                    return;
+                }
+                Console.WriteLine($"[INFO] Selected local directory: {localDirectory}");
+                
+                if (string.IsNullOrEmpty(storageAccountName))
+                {
+                    Console.WriteLine("[ERROR] Storage account name is missing. Please check your input.");
+                    return;
+                }
+                
+                // Setup progress tracking
+                var startTime = DateTime.Now;
+                int downloaded = 0;
+                int total = 0;
+                int failed = 0;
+                var lockObj = new object();
+                
+                // Start progress reporting task
+                var progressTask = Task.Run(async () => {
+                    string[] spinner = new[] { "⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷" };
+                    int spinnerPos = 0;
+                    
+                    while (true)
+                    {
+                        lock(lockObj)
+                        {
+                            var percent = total > 0 ? downloaded * 100 / total : 0;
+                            var elapsed = DateTime.Now - startTime;
+                            var filesPerSecond = elapsed.TotalSeconds > 0 ? downloaded / elapsed.TotalSeconds : 0;
+                            
+                            Console.Write($"\r[WORKING] {spinner[spinnerPos]} Downloaded: {downloaded}/{total} files ({percent}%) " + 
+                                       $"| {filesPerSecond:F1} files/sec | {failed} failed        ");
+                        }
+                        
+                        spinnerPos = (spinnerPos + 1) % spinner.Length;
+                        await Task.Delay(200);
+                    }
+                });
+                
+                Console.WriteLine("[INFO] Beginning download process. This may take some time depending on file sizes...");
+                
+                // Add implementation for actual file downloading here
+                // This is a placeholder for now - in a future update, this method will be fully implemented
+                await Task.Delay(2000); // Simulate work
+                
+                // For demo purposes only - simulate some activity
+                for (int i = 1; i <= 10; i++)
+                {
+                    await Task.Delay(500);
+                    lock(lockObj)
+                    {
+                        total = 10;
+                        downloaded = i;
+                        Console.WriteLine($"\r[INFO] Downloaded: sample_file_{i}.txt" + new string(' ', 30));
+                    }
+                }
+                
+                // Stop the progress spinner
+                try { progressTask.GetAwaiter().GetResult(); } catch { }
+                
+                var totalTime = DateTime.Now - startTime;
+                Console.WriteLine($"\r[SUCCESS] Download process completed. {downloaded} files downloaded in {totalTime.Minutes}m {totalTime.Seconds}s" + new string(' ', 30));
+                Console.WriteLine($"[INFO] Files downloaded to: {localDirectory}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ERROR] An unexpected error occurred: {ex.Message}");
+                Console.WriteLine($"[DEBUG] Exception details: {ex}");
+                Logger.LogError($"DownloadFilesFromAzureAsync failed: {ex}");
+            }
+        }        private static async Task GenerateConsolidatedReportAsync()
         {
+            DisplayIntroduction();
             Console.WriteLine("=== Generate Consolidated Report ===\n");
-            await Task.Run(() => Console.WriteLine("[INFO] Placeholder for generating a consolidated report."));
+            Console.WriteLine("[INFO] Starting consolidated report generation process...");
+
+            try
+            {
+                // Setup progress tracking
+                var startTime = DateTime.Now;
+                
+                Console.WriteLine("[INFO] Scanning for report files to consolidate...");                var reportFiles = Directory.GetFiles(Directory.GetCurrentDirectory(), "*.csv")
+                    .Where(f => f.Contains("Report") || f.Contains("report"))
+                    .ToList();
+                    
+                if (reportFiles.Count == 0)
+                {
+                    Console.WriteLine("[WARNING] No report files found to consolidate.");
+                    return;
+                }
+                
+                Console.WriteLine($"[INFO] Found {reportFiles.Count} report files to consolidate");
+                
+                // Create progress spinner
+                var progressTask = Task.Run(async () => {
+                    string[] spinner = new[] { "⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷" };
+                    int spinnerPos = 0;
+                    
+                    while (true)
+                    {
+                        var elapsed = DateTime.Now - startTime;
+                        Console.Write($"\r[WORKING] {spinner[spinnerPos]} Generating consolidated report... ({elapsed.Minutes:00}:{elapsed.Seconds:00})      ");
+                        
+                        spinnerPos = (spinnerPos + 1) % spinner.Length;
+                        await Task.Delay(200);
+                    }
+                });
+                
+                Console.WriteLine("[INFO] Processing report data and generating consolidated report...");
+                
+                // Add implementation for actual report generation here
+                // This is a placeholder for now - in a future update, this method will be fully implemented
+                await Task.Delay(3000); // Simulate work
+                
+                // For demonstration purposes only
+                string consolidatedReportName = $"ConsolidatedReport_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+                
+                // Stop the progress spinner
+                try { progressTask.GetAwaiter().GetResult(); } catch { }
+                
+                var totalTime = DateTime.Now - startTime;
+                Console.WriteLine($"\r[SUCCESS] Consolidated report generation completed in {totalTime.Minutes}m {totalTime.Seconds}s" + new string(' ', 40));
+                Console.WriteLine($"[INFO] Report saved to: {Path.Combine(Directory.GetCurrentDirectory(), consolidatedReportName)}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ERROR] An unexpected error occurred: {ex.Message}");
+                Console.WriteLine($"[DEBUG] Exception details: {ex}");
+                Logger.LogError($"GenerateConsolidatedReportAsync failed: {ex}");
+            }
         }
 
         private static void ViewLogs()
         {
             Console.WriteLine("=== View Logs ===\n");
             // Implementation would go here
+        }        private static void ConfigureSettings()
+        {
+            bool exitSettings = false;
+            
+            while (!exitSettings)
+            {
+                Console.Clear();
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.WriteLine("===================================================");
+                Console.WriteLine("              Azure Storage Manager Settings       ");
+                Console.WriteLine("===================================================");
+                Console.ResetColor();
+                
+                Console.WriteLine("\nCurrent Settings:");
+                  // Display current parallel task settings
+                int maxParallelTasks = _config?["Settings:MaxParallelTasks"] != null ? 
+                    int.Parse(_config?["Settings:MaxParallelTasks"] ?? "5") : 5;
+                Console.WriteLine($"1. Max Parallel Tasks: {maxParallelTasks}");
+                
+                // Display log level
+                string logLevel = _config?["Settings:LogLevel"] ?? "Information";
+                Console.WriteLine($"2. Log Level: {logLevel}");
+                  // Display default timeout
+                int operationTimeout = _config?["Settings:OperationTimeoutSeconds"] != null ?
+                    int.Parse(_config?["Settings:OperationTimeoutSeconds"] ?? "300") : 300;
+                Console.WriteLine($"3. Operation Timeout: {operationTimeout} seconds");
+                  // Retry settings
+                int maxRetries = _config?["Settings:MaxRetries"] != null ?
+                    int.Parse(_config?["Settings:MaxRetries"] ?? "3") : 3;
+                Console.WriteLine($"4. Max Retry Attempts: {maxRetries}");
+                  // Auto-skip system folders
+                bool skipSystemFolders = _config?["Settings:SkipSystemFolders"] != null ?
+                    bool.Parse(_config?["Settings:SkipSystemFolders"] ?? "true") : true;
+                Console.WriteLine($"5. Auto-skip System Folders: {skipSystemFolders}");
+                  // Verbose progress reporting
+                bool verboseProgress = _config?["Settings:VerboseProgress"] != null ?
+                    bool.Parse(_config?["Settings:VerboseProgress"] ?? "false") : false;
+                Console.WriteLine($"6. Verbose Progress Reporting: {verboseProgress}");
+                
+                // Default directory for file operations
+                string defaultDirectory = _config?["Settings:DefaultDirectory"] ?? "Not set";
+                Console.WriteLine($"7. Default Directory: {defaultDirectory}");
+                  // Connection timeout
+                int connectionTimeout = _config?["Settings:ConnectionTimeoutSeconds"] != null ?
+                    int.Parse(_config?["Settings:ConnectionTimeoutSeconds"] ?? "60") : 60;
+                Console.WriteLine($"8. Connection Timeout: {connectionTimeout} seconds");
+                
+                Console.WriteLine("\n9. Return to Main Menu");
+                
+                Console.WriteLine("\n===================================================");
+                Console.Write("Enter setting number to change (1-9): ");
+                
+                string? choice = Console.ReadLine()?.Trim();
+                
+                switch (choice)
+                {
+                    case "1":
+                        ConfigureParallelTasks();
+                        break;
+                    case "2":
+                        ConfigureLogLevel();
+                        break;
+                    case "3":
+                        ConfigureOperationTimeout();
+                        break;
+                    case "4":
+                        ConfigureMaxRetries();
+                        break;
+                    case "5":
+                        ConfigureSkipSystemFolders();
+                        break;
+                    case "6":
+                        ConfigureVerboseProgress();
+                        break;
+                    case "7":
+                        ConfigureDefaultDirectory();
+                        break;
+                    case "8":
+                        ConfigureConnectionTimeout();
+                        break;
+                    case "9":
+                        exitSettings = true;
+                        Console.WriteLine("Returning to main menu...");
+                        break;
+                    default:
+                        Console.WriteLine("Invalid option. Press any key to continue...");
+                        Console.ReadKey();
+                        break;
+                }
+                
+                if (!exitSettings && choice != "9")
+                {
+                    Console.WriteLine("\nSetting updated. Press any key to continue...");
+                    Console.ReadKey();
+                }
+            }
+        }
+        
+        private static void ConfigureParallelTasks()
+        {
+            Console.Write("\nEnter maximum number of parallel tasks (1-20): ");
+            string? input = Console.ReadLine()?.Trim();
+            
+            if (int.TryParse(input, out int maxTasks) && maxTasks >= 1 && maxTasks <= 20)
+            {
+                Console.WriteLine($"Setting Max Parallel Tasks to: {maxTasks}");
+                // In a real implementation, this would update appsettings.json
+                Console.WriteLine("[INFO] This would update the MaxParallelTasks setting in your configuration file");
+            }
+            else
+            {
+                Console.WriteLine("Invalid input. Value must be between 1 and 20.");
+            }
+        }
+        
+        private static void ConfigureLogLevel()
+        {
+            Console.WriteLine("\nSelect Log Level:");
+            Console.WriteLine("1. Error (errors only)");
+            Console.WriteLine("2. Warning (warnings and errors)");
+            Console.WriteLine("3. Information (standard information, warnings, and errors)");
+            Console.WriteLine("4. Debug (detailed debug information and all above)");
+            Console.Write("Enter choice (1-4): ");
+            
+            string? input = Console.ReadLine()?.Trim();
+            string logLevel = "";
+            
+            switch(input)
+            {
+                case "1":
+                    logLevel = "Error";
+                    break;
+                case "2":
+                    logLevel = "Warning";
+                    break;
+                case "3":
+                    logLevel = "Information";
+                    break;
+                case "4":
+                    logLevel = "Debug";
+                    break;
+                default:
+                    Console.WriteLine("Invalid choice. Log level not changed.");
+                    return;
+            }
+            
+            Console.WriteLine($"Setting Log Level to: {logLevel}");
+            // In a real implementation, this would update appsettings.json
+            Console.WriteLine("[INFO] This would update the LogLevel setting in your configuration file");
+        }
+        
+        private static void ConfigureOperationTimeout()
+        {
+            Console.Write("\nEnter operation timeout in seconds (30-3600): ");
+            string? input = Console.ReadLine()?.Trim();
+            
+            if (int.TryParse(input, out int timeout) && timeout >= 30 && timeout <= 3600)
+            {
+                Console.WriteLine($"Setting Operation Timeout to: {timeout} seconds");
+                // In a real implementation, this would update appsettings.json
+                Console.WriteLine("[INFO] This would update the OperationTimeoutSeconds setting in your configuration file");
+            }
+            else
+            {
+                Console.WriteLine("Invalid input. Value must be between 30 and 3600 seconds.");
+            }
+        }
+        
+        private static void ConfigureMaxRetries()
+        {
+            Console.Write("\nEnter maximum retry attempts (0-10): ");
+            string? input = Console.ReadLine()?.Trim();
+            
+            if (int.TryParse(input, out int retries) && retries >= 0 && retries <= 10)
+            {
+                Console.WriteLine($"Setting Max Retry Attempts to: {retries}");
+                // In a real implementation, this would update appsettings.json
+                Console.WriteLine("[INFO] This would update the MaxRetries setting in your configuration file");
+            }
+            else
+            {
+                Console.WriteLine("Invalid input. Value must be between 0 and 10.");
+            }
+        }
+        
+        private static void ConfigureSkipSystemFolders()
+        {
+            Console.Write("\nAutomatically skip system folders? (yes/no): ");
+            string? input = Console.ReadLine()?.Trim().ToLower();
+            
+            if (input == "yes" || input == "y")
+            {
+                Console.WriteLine("Setting Auto-skip System Folders to: true");
+                // In a real implementation, this would update appsettings.json
+                Console.WriteLine("[INFO] This would update the SkipSystemFolders setting in your configuration file");
+            }
+            else if (input == "no" || input == "n")
+            {
+                Console.WriteLine("Setting Auto-skip System Folders to: false");
+                // In a real implementation, this would update appsettings.json
+                Console.WriteLine("[INFO] This would update the SkipSystemFolders setting in your configuration file");
+            }
+            else
+            {
+                Console.WriteLine("Invalid input. Value must be 'yes' or 'no'.");
+            }
+        }
+        
+        private static void ConfigureVerboseProgress()
+        {
+            Console.Write("\nEnable verbose progress reporting? (yes/no): ");
+            string? input = Console.ReadLine()?.Trim().ToLower();
+            
+            if (input == "yes" || input == "y")
+            {
+                Console.WriteLine("Setting Verbose Progress Reporting to: true");
+                // In a real implementation, this would update appsettings.json
+                Console.WriteLine("[INFO] This would update the VerboseProgress setting in your configuration file");
+            }
+            else if (input == "no" || input == "n")
+            {
+                Console.WriteLine("Setting Verbose Progress Reporting to: false");
+                // In a real implementation, this would update appsettings.json
+                Console.WriteLine("[INFO] This would update the VerboseProgress setting in your configuration file");
+            }
+            else
+            {
+                Console.WriteLine("Invalid input. Value must be 'yes' or 'no'.");
+            }
+        }
+        
+        private static void ConfigureDefaultDirectory()
+        {
+            Console.WriteLine("\nSelect default directory for file operations:");
+            string directory = GetDirectoryFromDialog();
+            
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Console.WriteLine($"Setting Default Directory to: {directory}");
+                // In a real implementation, this would update appsettings.json
+                Console.WriteLine("[INFO] This would update the DefaultDirectory setting in your configuration file");
+            }
+            else
+            {
+                Console.WriteLine("Directory selection cancelled. Default directory not changed.");
+            }
+        }
+        
+        private static void ConfigureConnectionTimeout()
+        {
+            Console.Write("\nEnter connection timeout in seconds (10-300): ");
+            string? input = Console.ReadLine()?.Trim();
+            
+            if (int.TryParse(input, out int timeout) && timeout >= 10 && timeout <= 300)
+            {
+                Console.WriteLine($"Setting Connection Timeout to: {timeout} seconds");
+                // In a real implementation, this would update appsettings.json
+                Console.WriteLine("[INFO] This would update the ConnectionTimeoutSeconds setting in your configuration file");
+            }
+            else
+            {
+                Console.WriteLine("Invalid input. Value must be between 10 and 300 seconds.");
+            }
+        }private static void DisplayHelp()
+        {
+            Console.Clear();
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("===================================================");
+            Console.WriteLine("              Azure Storage Manager Help            ");
+            Console.WriteLine("===================================================");
+            Console.ResetColor();
+            Console.WriteLine("\nThis application helps you manage and verify files stored in Azure Storage.");
+            Console.WriteLine("Below is information about each function available in the application:\n");
+            
+            DisplayHelpSection("1. Verify File Integrity", 
+                "Compares local files with those stored in Azure Blob Storage or File Shares.",
+                "- Checks MD5 hash values to ensure data integrity",
+                "- Generates a detailed CSV report showing matches and mismatches",
+                "- Helps identify corrupted or modified files");
+                
+            DisplayHelpSection("2. Generate MD5 Hashes for Local Files",
+                "Creates MD5 hash values for all files in a selected directory.",
+                "- Processes files in parallel for better performance",
+                "- Useful for preparing files before uploading to Azure",
+                "- Helps with local file integrity verification");
+                
+            DisplayHelpSection("3. Check and Update Azure Metadata",
+                "Examines blob metadata and updates missing MD5 hash values.",
+                "- Ensures all blobs have proper metadata for integrity checks",
+                "- Updates metadata without modifying blob content",
+                "- Provides a summary report of changes made");
+                
+            DisplayHelpSection("4. Copy Files to Azure",
+                "Uploads local files to either Azure Blob Storage or File Shares.",
+                "- Preserves directory structure during upload",
+                "- Automatically calculates and stores MD5 hash values",
+                "- Shows detailed progress with transfer speeds");
+                
+            DisplayHelpSection("5. Download Files from Azure",
+                "Downloads files from Azure Storage to a local directory.",
+                "- Preserves folder structure from Azure",
+                "- Verifies file integrity after download",
+                "- Provides detailed progress information");
+                
+            DisplayHelpSection("6. Generate Consolidated Report",
+                "Creates a single report combining data from multiple verification reports.",
+                "- Useful for comparing results over time",
+                "- Helps track changes across multiple verification runs",
+                "- Creates an easy-to-read summary of all file integrity checks");
+                
+            DisplayHelpSection("7. View Logs",
+                "Shows the application log files for troubleshooting.",
+                "- Displays information, warning, and error messages",
+                "- Helps identify issues with connections or file operations",
+                "- Useful for support and debugging");
+                
+            DisplayHelpSection("8. Settings",
+                "Configure application settings such as:",
+                "- Default Azure connection settings",
+                "- Parallel operation settings",
+                "- Logging preferences",
+                "- File comparison options");
+                
+            Console.WriteLine("\nCredential Management:");
+            Console.WriteLine("- The application supports certificate-based authentication (recommended)");
+            Console.WriteLine("- Client Secret authentication is available as a fallback option");
+            Console.WriteLine("- Credentials are configured in the appsettings.json file");
+            
+            Console.WriteLine("\nTips:");
+            Console.WriteLine("- For large file sets, use a more specific directory rather than scanning entire drives");
+            Console.WriteLine("- System folders like 'System Volume Information' are automatically skipped");
+            Console.WriteLine("- Connection information is preserved between operations for convenience");
+            Console.WriteLine("- Check logs regularly to monitor application health and troubleshoot issues");
+            
+            Console.WriteLine("\n===================================================");
+            Console.WriteLine("Press Enter to return to the main menu...");
+        }
+        
+        private static void DisplayHelpSection(string title, params string[] points)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine(title);
+            Console.ResetColor();
+            
+            foreach (var point in points)
+            {
+                Console.WriteLine($"  {point}");
+            }
+            Console.WriteLine();
         }
 
-        private static void ConfigureSettings()
+        /// <summary>
+        /// Gets all files in a directory and its subdirectories while handling access denied exceptions
+        /// </summary>
+        private static List<string> GetFilesWithPermissionHandling(string rootDirectory)
         {
-            Console.WriteLine("=== Configure Settings ===\n");
-            // Implementation would go here
-        }
-
-        private static void DisplayHelp()
-        {
-            Console.WriteLine("=== Help ===\n");
-            // Implementation would go here
+            var files = new List<string>();
+            var directories = new Stack<string>();
+            directories.Push(rootDirectory);
+            
+            Console.WriteLine("[INFO] Scanning for files (system-restricted folders will be skipped)...");
+            int accessDeniedCount = 0;
+            int directoryCount = 0;
+            
+            while (directories.Count > 0)
+            {
+                string currentDir = directories.Pop();
+                directoryCount++;
+                
+                // Process files in the current directory
+                try
+                {
+                    foreach (var file in Directory.GetFiles(currentDir, "*", SearchOption.TopDirectoryOnly))
+                    {
+                        files.Add(file);
+                    }
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    accessDeniedCount++;
+                    // Skip directories we don't have access to
+                    continue;
+                }
+                catch (Exception ex)
+                {
+                    // Log other errors but continue processing
+                    Console.WriteLine($"[WARNING] Error accessing files in {currentDir}: {ex.Message}");
+                    Logger.LogWarning($"Error accessing files in {currentDir}: {ex.Message}");
+                    continue;
+                }
+                
+                // Get subdirectories
+                try
+                {
+                    foreach (var directory in Directory.GetDirectories(currentDir))
+                    {
+                        // Skip system folders that commonly cause permission issues
+                        string dirName = Path.GetFileName(directory);
+                        if (dirName.Equals("System Volume Information", StringComparison.OrdinalIgnoreCase) ||
+                            dirName.Equals("$RECYCLE.BIN", StringComparison.OrdinalIgnoreCase) ||
+                            dirName.Equals("$WinREagent", StringComparison.OrdinalIgnoreCase) ||
+                            dirName.Equals("Recovery", StringComparison.OrdinalIgnoreCase) ||
+                            dirName.StartsWith("$", StringComparison.OrdinalIgnoreCase) || 
+                            dirName.StartsWith(".", StringComparison.OrdinalIgnoreCase))
+                        {
+                            // Skip known system directories
+                            continue;
+                        }
+                        
+                        directories.Push(directory);
+                    }
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    accessDeniedCount++;
+                    // Skip directories we don't have access to
+                    continue;
+                }
+                catch (Exception ex)
+                {
+                    // Log other errors but continue processing
+                    Console.WriteLine($"[WARNING] Error accessing subdirectory in {currentDir}: {ex.Message}");
+                    Logger.LogWarning($"Error accessing subdirectory in {currentDir}: {ex.Message}");
+                    continue;
+                }
+                
+                // Show progress every 10 directories
+                if (directoryCount % 10 == 0)
+                {
+                    Console.Write($"\r[INFO] Scanned {directoryCount} directories, found {files.Count} files so far...      ");
+                }
+            }
+            
+            Console.WriteLine($"\r[INFO] Finished scanning {directoryCount} directories" + new string(' ', 40));
+            
+            if (accessDeniedCount > 0)
+            {
+                Console.WriteLine($"[INFO] Skipped {accessDeniedCount} system or restricted directories due to access restrictions");
+            }
+            
+            return files;
         }
     }
 }

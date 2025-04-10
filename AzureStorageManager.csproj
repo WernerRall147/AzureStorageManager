@@ -1,13 +1,25 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">  <PropertyGroup>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net9.0-windows</TargetFramework>    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <!-- Temporarily commenting out the icon reference to resolve build error -->
-    <!-- <ApplicationIcon>Assets\app_icon.ico</ApplicationIcon> -->
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>    <Nullable>enable</Nullable>
     <WarningsAsErrors>nullable</WarningsAsErrors>
     <LangVersion>latest</LangVersion>
-    <!-- Removing StartupObject to avoid conflict with top-level statements -->
     <StartupObject>AzureStorageManager.Program</StartupObject>
+    <ApplicationIcon>Assets\storagemanagericon.ico</ApplicationIcon>
+    <Version>1.0.0</Version>
+    <Authors>Azure Storage Manager Team</Authors>
+    <Company>Azure Storage Manager</Company>
+    <Description>A tool for managing and verifying Azure Storage files</Description>
+  </PropertyGroup>
+
+  <!-- Publishing settings -->
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,5 +34,4 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.WindowsDesktop.App.WindowsForms" />
   </ItemGroup>
-  <!-- Removed duplicate reference to Azure.Storage.Files.Shares -->
 </Project>

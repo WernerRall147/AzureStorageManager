@@ -1,0 +1,6 @@
+C:\Users\weral\Git\AzureStorageManager\obj\Debug\net9.0-windows\win-x64\AzureStorageManager.csproj.AssemblyReference.cache
+C:\Users\weral\Git\AzureStorageManager\obj\Debug\net9.0-windows\win-x64\AzureStorageManager.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\weral\Git\AzureStorageManager\obj\Debug\net9.0-windows\win-x64\AzureStorageManager.AssemblyInfoInputs.cache
+C:\Users\weral\Git\AzureStorageManager\obj\Debug\net9.0-windows\win-x64\AzureStorageManager.AssemblyInfo.cs
+C:\Users\weral\Git\AzureStorageManager\obj\Debug\net9.0-windows\win-x64\AzureStorageManager.csproj.CoreCompileInputs.cache
+C:\Users\weral\Git\AzureStorageManager\obj\Debug\net9.0-windows\win-x64\AzureStorageManager.sourcelink.json
