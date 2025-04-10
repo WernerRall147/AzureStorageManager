@@ -32,9 +32,7 @@ namespace AzureStorageManager.Services
         {
             _shareServiceClient = new ShareServiceClient(new Uri(serviceUri), credential, options);
             _shareClient = _shareServiceClient.GetShareClient(fileShareName);
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Lists files in the given file share directory, compares their MD5 hashes with local files,
         /// updates metadata if there is a mismatch, and exports both a full report and a mismatches-only report.
         /// </summary>
@@ -43,11 +41,14 @@ namespace AzureStorageManager.Services
         public async Task ListAndVerifyFilesAsync(string localDirectory, string csvFileName)
         {
             var fileMetadataList = new List<FileMetadata>();
+            var processedLocalFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase); // To track which local files we've processed
+            var azureFilesDict = new Dictionary<string, (string hash, string path, long size)>(StringComparer.OrdinalIgnoreCase);
 
             try
             {
                 var rootDirectoryClient = _shareClient.GetRootDirectoryClient();
 
+                // First collect all Azure files into a dictionary for efficient lookup
                 await foreach (var fileItem in rootDirectoryClient.GetFilesAndDirectoriesAsync())
                 {
                     if (!fileItem.IsDirectory)
@@ -57,71 +58,132 @@ namespace AzureStorageManager.Services
                         // Fetch file properties and retrieve the remote MD5 hash from metadata
                         var fileProperties = await fileClient.GetPropertiesAsync();
                         fileProperties.Value.Metadata.TryGetValue("md5", out string? remoteMD5);
+                        string remotePath = fileClient.Uri.ToString();
+                        long fileSize = fileProperties.Value.ContentLength;
 
-                        // Compute the local MD5 hash from the corresponding local file
-                        string localFilePath = Path.Combine(localDirectory, fileItem.Name);
+                        // Store in dictionary for lookup
+                        azureFilesDict[fileItem.Name] = (remoteMD5 ?? "", remotePath, fileSize);
+                    }
+                }                // First collect all Azure files into a dictionary for efficient lookup
+                await foreach (var fileItem in rootDirectoryClient.GetFilesAndDirectoriesAsync())
+                {
+                    if (!fileItem.IsDirectory)
+                    {
+                        var fileClient = rootDirectoryClient.GetFileClient(fileItem.Name);
 
-                        // Check if the local file exists
-                        if (!File.Exists(localFilePath))
-                        {
-                            fileMetadataList.Add(new FileMetadata(
-                                fileItem.Name,
-                                "",              // localHash
-                                remoteMD5 ?? "",
-                                "LocalFileMissing"
-                            ));
-                            continue;
-                        }
+                        // Fetch file properties and retrieve the remote MD5 hash from metadata
+                        var fileProperties = await fileClient.GetPropertiesAsync();
+                        fileProperties.Value.Metadata.TryGetValue("md5", out string? remoteMD5);
+                        string remotePath = fileClient.Uri.ToString();
+                        long fileSize = fileProperties.Value.ContentLength;
 
-                        string localMD5 = FileHashUtility.CalculateMD5(localFilePath);
-
-                        // Only set the metadata if remoteMD5 doesn't exist or is empty
-                        if (string.IsNullOrEmpty(remoteMD5))
-                        {
-                            await fileClient.SetMetadataAsync(new Dictionary<string, string>
-                            {
-                                { "md5", localMD5 }
-                            });
-
-                            // Re-fetch the properties to confirm the update (optional)
-                            var updatedProperties = await fileClient.GetPropertiesAsync();
-                            updatedProperties.Value.Metadata.TryGetValue("md5", out remoteMD5);
-                        }
-
-                        // Determine status
-                        string status = (remoteMD5 == localMD5) ? "Match" : "Mismatch";
-                        fileMetadataList.Add(new FileMetadata(
-                            fileItem.Name,
-                            localMD5,
-                            remoteMD5 ?? "",
-                            status
-                        ));
+                        // Store in dictionary for lookup
+                        azureFilesDict[fileItem.Name] = (remoteMD5 ?? "", remotePath, fileSize);
                     }
                 }
 
-                // Generate timestamp for report filenames
-                string timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
-                string directoryPath = Path.GetDirectoryName(csvFileName) ?? Directory.GetCurrentDirectory();
+                // Now process local files and match with Azure files
+                if (Directory.Exists(localDirectory))
+                {
+                    try
+                    {
+                        // Get all files in the local directory
+                        var localFiles = Directory.GetFiles(localDirectory);
+                        
+                        foreach (var localFilePath in localFiles)
+                        {
+                            // Get just the file name for comparison
+                            string fileName = Path.GetFileName(localFilePath);
+                            string localMD5 = FileHashUtility.CalculateMD5(localFilePath);
+                            long localFileSize = new FileInfo(localFilePath).Length;
+                            
+                            // Check if this file exists in Azure
+                            if (azureFilesDict.TryGetValue(fileName, out var azureInfo))
+                            {
+                                string status = (azureInfo.hash == localMD5) ? "Match" : "Mismatch";
+                                
+                                // Add file with both local and Azure information
+                                fileMetadataList.Add(new FileMetadata(
+                                    fileName,
+                                    localMD5,
+                                    azureInfo.hash,
+                                    status,
+                                    localFilePath,
+                                    azureInfo.path,
+                                    localFileSize
+                                ));
+                                
+                                // If the Azure file doesn't have MD5 metadata, set it
+                                if (string.IsNullOrEmpty(azureInfo.hash))
+                                {
+                                    var fileClient = rootDirectoryClient.GetFileClient(fileName);
+                                    await fileClient.SetMetadataAsync(new Dictionary<string, string>
+                                    {
+                                        { "md5", localMD5 }
+                                    });
+                                }
+                                
+                                // Mark as processed
+                                processedLocalFiles.Add(fileName);
+                                
+                                // Remove from Azure dictionary to track what's been processed
+                                azureFilesDict.Remove(fileName);
+                            }
+                            else
+                            {
+                                // Local-only file
+                                fileMetadataList.Add(new FileMetadata(
+                                    fileName,
+                                    localMD5,
+                                    "", // No remote hash since file doesn't exist in Azure
+                                    "AzureFileMissing", // Status indicating file is missing in Azure
+                                    localFilePath,
+                                    "", // No remote path since file doesn't exist in Azure
+                                    localFileSize
+                                ));
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Warning: Error scanning local directory: {ex.Message}");
+                    }
+                }
+                
+                // Add remaining Azure-only files
+                foreach (var item in azureFilesDict)
+                {
+                    fileMetadataList.Add(new FileMetadata(
+                        item.Key,
+                        "", // No local hash
+                        item.Value.hash,
+                        "LocalFileMissing",
+                        "", // No local path
+                        item.Value.path,
+                        item.Value.size
+                    ));
+                }                // Add remaining Azure-only files
+                foreach (var item in azureFilesDict)
+                {
+                    fileMetadataList.Add(new FileMetadata(
+                        item.Key,
+                        "", // No local hash
+                        item.Value.hash,
+                        "LocalFileMissing",
+                        "", // No local path
+                        item.Value.path,
+                        item.Value.size
+                    ));
+                }
 
-                // Create full report
-                string fullReportFileName = Path.Combine(directoryPath, $"FullReport_{timestamp}.csv");
-                CsvExporter.ExportToCsv(fileMetadataList, fullReportFileName);
-
-                // Create mismatches-only report
-                var mismatchesOnly = fileMetadataList
-                    .Where(f => !string.Equals(f.Status, "Match", StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-
-                string mismatchesReportFileName = Path.Combine(directoryPath, $"MismatchesOnlyReport_{timestamp}.csv");
-                CsvExporter.ExportToCsv(mismatchesOnly, mismatchesReportFileName);
-
-                Console.WriteLine("Verification complete.");
-                Console.WriteLine($"Full report saved to {fullReportFileName}");
-                Console.WriteLine($"Mismatches-only report saved to {mismatchesReportFileName}");
+                // Export the results to CSV
+                CsvExporter.ExportToCsv(fileMetadataList, csvFileName);
+                Console.WriteLine($"Report saved to: {csvFileName}");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"An error occurred while processing files: {ex.Message}");
+                throw;
             }
         }
 

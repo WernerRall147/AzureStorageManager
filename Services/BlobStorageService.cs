@@ -20,64 +20,24 @@ namespace AzureStorageManager.Services
         {
             var fileMetadataList = new List<FileMetadata>();
             var processedLocalFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase); // To track which local files we've processed
+            var azureFilesDict = new Dictionary<string, (string hash, string path, long size)>(StringComparer.OrdinalIgnoreCase);
 
-            // First process all Azure blob files
+            // First collect all Azure blob files into a dictionary for efficient lookup
             await foreach (var blobItem in _containerClient.GetBlobsAsync())
-            {var blobClient = _containerClient.GetBlobClient(blobItem.Name);
+            {
+                var blobClient = _containerClient.GetBlobClient(blobItem.Name);
 
                 // Get blob properties and metadata
                 var blobProperties = await blobClient.GetPropertiesAsync();
-                blobProperties.Value.Metadata.TryGetValue("md5", out string? remoteMD5);                string localFilePath = Path.Combine(localDirectory, blobItem.Name);
+                blobProperties.Value.Metadata.TryGetValue("md5", out string? remoteMD5);
                 string remotePath = blobClient.Uri.ToString();
                 long fileSize = blobItem.Properties.ContentLength ?? 0; // Use default 0 if null
 
-                // Check if local file exists
-                if (!File.Exists(localFilePath))
-                {
-                    fileMetadataList.Add(new FileMetadata(
-                        blobItem.Name,
-                        "",                 // localHash
-                        remoteMD5 ?? "",
-                        "LocalFileMissing",
-                        "",                 // localPath (empty since file doesn't exist)
-                        remotePath,
-                        fileSize
-                    ));
-                    continue;
-                }
-
-                string localMD5 = FileHashUtility.CalculateMD5(localFilePath);
-                long localFileSize = new FileInfo(localFilePath).Length;
-
-                // Only set the metadata if remoteMD5 doesn't exist or is empty
-                if (string.IsNullOrEmpty(remoteMD5))
-                {
-                    await blobClient.SetMetadataAsync(new Dictionary<string, string>
-                    {
-                        { "md5", localMD5 }
-                    });
-
-                    // Re-fetch properties to confirm update (optional)
-                    var updatedProperties = await blobClient.GetPropertiesAsync();
-                    updatedProperties.Value.Metadata.TryGetValue("md5", out remoteMD5);
-                }
-                
-                // Determine status
-                string status = (remoteMD5 == localMD5) ? "Match" : "Mismatch";
-                fileMetadataList.Add(new FileMetadata(
-                    blobItem.Name,
-                    localMD5,
-                    remoteMD5 ?? "",
-                    status,
-                    localFilePath,
-                    remotePath,
-                    localFileSize                ));
-                
-                // Keep track of processed local files
-                processedLocalFiles.Add(blobItem.Name);
+                // Store in dictionary for lookup
+                azureFilesDict[blobItem.Name] = (remoteMD5 ?? "", remotePath, fileSize);
             }
-            
-            // Now scan local directory to find files that don't exist in Azure
+
+            // Now process local files and match with Azure files
             if (Directory.Exists(localDirectory))
             {
                 try
@@ -89,30 +49,64 @@ namespace AzureStorageManager.Services
                     {
                         // Get the relative path from the local directory
                         string relativePath = Path.GetRelativePath(localDirectory, localFilePath);
-                        
-                        // Skip if we've already processed this file (it exists in Azure)
-                        if (processedLocalFiles.Contains(relativePath))
-                            continue;
-                        
-                        // If we reach here, this is a local-only file
                         string localMD5 = FileHashUtility.CalculateMD5(localFilePath);
                         long localFileSize = new FileInfo(localFilePath).Length;
                         
-                        fileMetadataList.Add(new FileMetadata(
-                            relativePath,
-                            localMD5,
-                            "", // No remote hash since file doesn't exist in Azure
-                            "AzureBlobMissing", // Status indicating file is missing in Azure
-                            localFilePath,
-                            "", // No remote path since file doesn't exist in Azure
-                            localFileSize
-                        ));
+                        // Check if this file exists in Azure
+                        if (azureFilesDict.TryGetValue(relativePath, out var azureInfo))
+                        {
+                            string status = (azureInfo.hash == localMD5) ? "Match" : "Mismatch";
+                            
+                            // Add file with both local and Azure information
+                            fileMetadataList.Add(new FileMetadata(
+                                relativePath,
+                                localMD5,
+                                azureInfo.hash,
+                                status,
+                                localFilePath,
+                                azureInfo.path,
+                                localFileSize
+                            ));
+                            
+                            // Mark as processed
+                            processedLocalFiles.Add(relativePath);
+                            
+                            // Remove from Azure dictionary to track what's been processed
+                            azureFilesDict.Remove(relativePath);
+                        }
+                        else
+                        {
+                            // Local-only file
+                            fileMetadataList.Add(new FileMetadata(
+                                relativePath,
+                                localMD5,
+                                "", // No remote hash since file doesn't exist in Azure
+                                "AzureBlobMissing", // Status indicating file is missing in Azure
+                                localFilePath,
+                                "", // No remote path since file doesn't exist in Azure
+                                localFileSize
+                            ));
+                        }
                     }
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"Warning: Error scanning local directory: {ex.Message}");
                 }
+            }
+            
+            // Add remaining Azure-only files
+            foreach (var item in azureFilesDict)
+            {
+                fileMetadataList.Add(new FileMetadata(
+                    item.Key,
+                    "", // No local hash
+                    item.Value.hash,
+                    "LocalFileMissing",
+                    "", // No local path
+                    item.Value.path,
+                    item.Value.size
+                ));
             }
             
             // Generate timestamp for report filename

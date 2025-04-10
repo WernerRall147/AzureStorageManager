@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyDescriptionAttribute("A tool for managing and verifying Azure Storage files")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+3ad8023793c76681062c8a280567f47f50559869")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0f935316d4889ad9e156dbb138af62ab1a32df22")]
 [assembly: System.Reflection.AssemblyProductAttribute("AzureStorageManager")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AzureStorageManager")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

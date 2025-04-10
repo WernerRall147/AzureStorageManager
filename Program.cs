@@ -116,13 +116,20 @@ namespace AzureStorageManager
             Console.WriteLine("10. Exit");
             Console.WriteLine("=======================================");
             Console.Write("Enter your choice: ");
-        }
-
-        private static void DisplayIntroduction()
+        }        private static void DisplayIntroduction()
         {
             Console.WriteLine("=======================================");
             Console.WriteLine("        Azure Storage Manager Tool      ");
             Console.WriteLine("=======================================");
+
+            // Display current connection status if there is one - show the same status bar as in main menu
+            if (Models.ConnectionState.IsStorageAccountConnected)
+            {
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine(Models.ConnectionState.GetConnectionInfoString());
+                Console.ResetColor();
+            }
+
             Console.WriteLine();
             Console.WriteLine("This tool helps you verify file integrity by comparing local files with those stored in Azure.");
             Console.WriteLine("It checks that files in Azure Blob Storage or File Shares match your local copies.");
@@ -1085,14 +1092,15 @@ namespace AzureStorageManager
                         totalBytes += fileInfo.Length;
                     }
                     catch { } // Ignore files we can't access
-                }
-
-                // Format total size for display
+                }                // Format total size for display
                 string totalSizeFormatted = totalBytes < 1024 * 1024 ?
                     $"{totalBytes / 1024.0:F1} KB" :
                     $"{totalBytes / (1024.0 * 1024.0):F1} MB";
 
                 Console.WriteLine($"[INFO] Total upload size: {totalSizeFormatted}");
+
+                // Create cancellation token source for progress task
+                var cts = new CancellationTokenSource();
 
                 // Start progress reporting task
                 var progressTask = Task.Run(async () =>
@@ -1100,7 +1108,7 @@ namespace AzureStorageManager
                     string[] spinner = new[] { "⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷" };
                     int spinnerPos = 0;
 
-                    while (true)
+                    while (!cts.Token.IsCancellationRequested)
                     {
                         lock (lockObj)
                         {
@@ -1141,10 +1149,14 @@ namespace AzureStorageManager
                         var relativePath = filesToUpload[i - 1].Replace(localDirectory, "").TrimStart('\\');
                         Console.WriteLine($"\r[INFO] Uploaded: {relativePath}" + new string(' ', 30));
                     }
-                }
-
-                // Stop the progress spinner
-                try { progressTask.GetAwaiter().GetResult(); } catch { }
+                }                // Stop the progress spinner by cancelling the token
+                cts.Cancel();
+                try 
+                { 
+                    // Wait a short time for the task to respond to cancellation
+                    await Task.WhenAny(progressTask, Task.Delay(1000));
+                } 
+                catch { /* Ignore any exceptions during task cancellation */ }
 
                 var totalTime = DateTime.Now - startTime;
                 string uploadSpeedFormatted = totalTime.TotalSeconds > 0 ?
