@@ -95,8 +95,9 @@ Run 4: I am very happy with the testing we just need to make one final change. T
   3. Select a root directory (E:\)
   4. Complete verification
 - **Expected Result**: System folders skipped, accessible files processed
-- **Observations**: [To be filled after testing]
-- **Log Files**: [List relevant log files]
+- **Observations**: Perfcet, no issues
+- **Log Files**: added to Tests folder
+AzureStorageReport_20250410115702.csv
 - **Status**: ⬜ Not Started / ✅ Passed / ❌ Failed
 
 ### Category 3: File Transfer Operations
@@ -109,9 +110,9 @@ Run 4: I am very happy with the testing we just need to make one final change. T
   3. Select a directory with mixed file types
   4. Complete upload
 - **Expected Result**: All files uploaded with proper MD5 hashes
-- **Observations**: [To be filled after testing]
-- **Log Files**: [List relevant log files]
-- **Status**: ⬜ Not Started / ✅ Passed / ❌ Failed
+- **Observations**: Authentication failed during testing. The application successfully loaded the certificate from the Windows Certificate Store (CN=AzureAuthCertificate) but returned "Authentication failed - no valid credentials provided" error. This suggests an issue with how the certificate is being used for authentication or with the Azure AD app registration configuration. The error indicates that while the certificate was found and loaded, it was not accepted as valid authentication by Azure.
+- **Log Files**: Scenario3_1_Upload_Start_20250410_145923.zip, Scenario3_1_Upload_End_20250410_150056.zip
+- **Status**: ❌ Failed
 
 #### Scenario 3.2: Download from Azure
 - **Description**: Download files from Azure to local directory

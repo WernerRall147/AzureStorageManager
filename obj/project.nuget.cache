@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "xSTNL8dIfRQ=",
+  "dgSpecHash": "gphJGAk7rNA=",
   "success": true,
   "projectFilePath": "C:\\Users\\weral\\Git\\AzureStorageManager\\AzureStorageManager.csproj",
   "expectedPackageFiles": [
@@ -19,7 +19,7 @@
     "C:\\Users\\weral\\.nuget\\packages\\microsoft.extensions.fileproviders.physical\\9.0.0\\microsoft.extensions.fileproviders.physical.9.0.0.nupkg.sha512",
     "C:\\Users\\weral\\.nuget\\packages\\microsoft.extensions.filesystemglobbing\\9.0.0\\microsoft.extensions.filesystemglobbing.9.0.0.nupkg.sha512",
     "C:\\Users\\weral\\.nuget\\packages\\microsoft.extensions.primitives\\9.0.0\\microsoft.extensions.primitives.9.0.0.nupkg.sha512",
-    "C:\\Users\\weral\\.nuget\\packages\\microsoft.identity.client\\4.66.1\\microsoft.identity.client.4.66.1.nupkg.sha512",
+    "C:\\Users\\weral\\.nuget\\packages\\microsoft.identity.client\\4.70.2\\microsoft.identity.client.4.70.2.nupkg.sha512",
     "C:\\Users\\weral\\.nuget\\packages\\microsoft.identity.client.extensions.msal\\4.66.1\\microsoft.identity.client.extensions.msal.4.66.1.nupkg.sha512",
     "C:\\Users\\weral\\.nuget\\packages\\microsoft.identitymodel.abstractions\\6.35.0\\microsoft.identitymodel.abstractions.6.35.0.nupkg.sha512",
     "C:\\Users\\weral\\.nuget\\packages\\microsoft.net.illink.tasks\\9.0.4\\microsoft.net.illink.tasks.9.0.4.nupkg.sha512",

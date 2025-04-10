@@ -51,7 +51,11 @@ namespace AzureStorageManager.Models
         /// </summary>
         public static bool IsStorageAccountConnected => !string.IsNullOrEmpty(StorageAccountName) && 
                                                        (BlobServiceClient != null || ShareServiceClient != null);
-                                                       
+                                                         /// <summary>
+        /// Authentication method used for the current connection
+        /// </summary>
+        public static string? AuthenticationType { get; set; }
+
         /// <summary>
         /// Returns a formatted string with the current connection status
         /// </summary>
@@ -61,6 +65,9 @@ namespace AzureStorageManager.Models
                 return "No storage account connected";
                 
             string info = $"Connected to: {StorageAccountName}";
+            
+            if (!string.IsNullOrEmpty(AuthenticationType))
+                info += $" | Auth: {AuthenticationType}";
             
             if (!string.IsNullOrEmpty(BlobContainerName))
                 info += $" | Container: {BlobContainerName}";

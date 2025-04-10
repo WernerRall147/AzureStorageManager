@@ -1,2 +1,37 @@
-# Ignore bin directory
+# Ignore binary and build output
 bin/
+obj/
+
+# Ignore TestingFramework logs and data
+TestingFramework/Tests/
+*.zip
+
+# Exclude personal and sensitive data
+appsettings.Development.json
+**/Properties/launchSettings.json
+
+# IDE and editor files
+.vs/
+.vscode/
+*_i.c
+*_p.c
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# .NET build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+build/
+bld/
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+msbuild.log
+msbuild.err
+msbuild.wrn

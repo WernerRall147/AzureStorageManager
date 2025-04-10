@@ -285,19 +285,19 @@
           "buildTransitive/net8.0/_._": {}
         }
       },
-      "Microsoft.Identity.Client/4.66.1": {
+      "Microsoft.Identity.Client/4.70.2": {
         "type": "package",
         "dependencies": {
           "Microsoft.IdentityModel.Abstractions": "6.35.0",
           "System.Diagnostics.DiagnosticSource": "6.0.1"
         },
         "compile": {
-          "lib/net6.0/Microsoft.Identity.Client.dll": {
+          "lib/net8.0/Microsoft.Identity.Client.dll": {
             "related": ".xml"
           }
         },
         "runtime": {
-          "lib/net6.0/Microsoft.Identity.Client.dll": {
+          "lib/net8.0/Microsoft.Identity.Client.dll": {
             "related": ".xml"
           }
         }
@@ -799,19 +799,19 @@
           "buildTransitive/net8.0/_._": {}
         }
       },
-      "Microsoft.Identity.Client/4.66.1": {
+      "Microsoft.Identity.Client/4.70.2": {
         "type": "package",
         "dependencies": {
           "Microsoft.IdentityModel.Abstractions": "6.35.0",
           "System.Diagnostics.DiagnosticSource": "6.0.1"
         },
         "compile": {
-          "lib/net6.0/Microsoft.Identity.Client.dll": {
+          "lib/net8.0/Microsoft.Identity.Client.dll": {
             "related": ".xml"
           }
         },
         "runtime": {
-          "lib/net6.0/Microsoft.Identity.Client.dll": {
+          "lib/net8.0/Microsoft.Identity.Client.dll": {
             "related": ".xml"
           }
         }
@@ -1392,10 +1392,10 @@
         "useSharedDesignerContext.txt"
       ]
     },
-    "Microsoft.Identity.Client/4.66.1": {
-      "sha512": "mE+m3pZ7zSKocSubKXxwZcUrCzLflC86IdLxrVjS8tialy0b1L+aECBqRBC/ykcPlB4y7skg49TaTiA+O2UfDw==",
+    "Microsoft.Identity.Client/4.70.2": {
+      "sha512": "5fEtHwaFYOotFCb4sCl/Ssy9fHm45PWlDuPP3Taw3+pjbu+56g5l6w7sN4y+ukiDR4VC668vjyEdgB7naUUaPA==",
       "type": "package",
-      "path": "microsoft.identity.client/4.66.1",
+      "path": "microsoft.identity.client/4.70.2",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
@@ -1404,15 +1404,16 @@
         "lib/net462/Microsoft.Identity.Client.xml",
         "lib/net472/Microsoft.Identity.Client.dll",
         "lib/net472/Microsoft.Identity.Client.xml",
-        "lib/net6.0-android31.0/Microsoft.Identity.Client.dll",
-        "lib/net6.0-android31.0/Microsoft.Identity.Client.xml",
-        "lib/net6.0-ios15.4/Microsoft.Identity.Client.dll",
-        "lib/net6.0-ios15.4/Microsoft.Identity.Client.xml",
-        "lib/net6.0/Microsoft.Identity.Client.dll",
-        "lib/net6.0/Microsoft.Identity.Client.xml",
+        "lib/net8.0-android34.0/Microsoft.Identity.Client.aar",
+        "lib/net8.0-android34.0/Microsoft.Identity.Client.dll",
+        "lib/net8.0-android34.0/Microsoft.Identity.Client.xml",
+        "lib/net8.0-ios18.0/Microsoft.Identity.Client.dll",
+        "lib/net8.0-ios18.0/Microsoft.Identity.Client.xml",
+        "lib/net8.0/Microsoft.Identity.Client.dll",
+        "lib/net8.0/Microsoft.Identity.Client.xml",
         "lib/netstandard2.0/Microsoft.Identity.Client.dll",
         "lib/netstandard2.0/Microsoft.Identity.Client.xml",
-        "microsoft.identity.client.4.66.1.nupkg.sha512",
+        "microsoft.identity.client.4.70.2.nupkg.sha512",
         "microsoft.identity.client.nuspec"
       ]
     },
@@ -1858,6 +1859,7 @@
       "Microsoft.Extensions.Configuration >= 9.0.0",
       "Microsoft.Extensions.Configuration.EnvironmentVariables >= 9.0.0",
       "Microsoft.Extensions.Configuration.Json >= 9.0.0",
+      "Microsoft.Identity.Client >= 4.70.2",
       "Microsoft.NET.ILLink.Tasks >= 9.0.4"
     ]
   },
@@ -1895,6 +1897,11 @@
           "projectReferences": {}
         }
       },
+      "warningProperties": {
+        "warnAsError": [
+          "NU1605"
+        ]
+      },
       "restoreAuditProperties": {
         "enableAudit": "true",
         "auditLevel": "low",
@@ -1929,6 +1936,10 @@
           "Microsoft.Extensions.Configuration.Json": {
             "target": "Package",
             "version": "[9.0.0, )"
+          },
+          "Microsoft.Identity.Client": {
+            "target": "Package",
+            "version": "[4.70.2, )"
           },
           "Microsoft.NET.ILLink.Tasks": {
             "suppressParent": "All",

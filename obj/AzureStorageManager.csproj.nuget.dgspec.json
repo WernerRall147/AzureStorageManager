@@ -34,6 +34,11 @@
             "projectReferences": {}
           }
         },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
         "restoreAuditProperties": {
           "enableAudit": "true",
           "auditLevel": "low",
@@ -68,6 +73,10 @@
             "Microsoft.Extensions.Configuration.Json": {
               "target": "Package",
               "version": "[9.0.0, )"
+            },
+            "Microsoft.Identity.Client": {
+              "target": "Package",
+              "version": "[4.70.2, )"
             },
             "Microsoft.NET.ILLink.Tasks": {
               "suppressParent": "All",
