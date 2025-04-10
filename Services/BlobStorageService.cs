@@ -16,21 +16,20 @@ namespace AzureStorageManager.Services
         public BlobStorageService(BlobServiceClient blobServiceClient, string containerName)
         {
             _containerClient = blobServiceClient.GetBlobContainerClient(containerName);
-        }
-
-        public async Task ListAndVerifyBlobsAsync(string localDirectory, string csvFileName)
+        }        public async Task ListAndVerifyBlobsAsync(string localDirectory, string csvFileName)
         {
             var fileMetadataList = new List<FileMetadata>();
+            var processedLocalFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase); // To track which local files we've processed
 
+            // First process all Azure blob files
             await foreach (var blobItem in _containerClient.GetBlobsAsync())
-            {
-                var blobClient = _containerClient.GetBlobClient(blobItem.Name);
+            {var blobClient = _containerClient.GetBlobClient(blobItem.Name);
 
                 // Get blob properties and metadata
                 var blobProperties = await blobClient.GetPropertiesAsync();
-                blobProperties.Value.Metadata.TryGetValue("md5", out string? remoteMD5);
-
-                string localFilePath = Path.Combine(localDirectory, blobItem.Name);
+                blobProperties.Value.Metadata.TryGetValue("md5", out string? remoteMD5);                string localFilePath = Path.Combine(localDirectory, blobItem.Name);
+                string remotePath = blobClient.Uri.ToString();
+                long fileSize = blobItem.Properties.ContentLength ?? 0; // Use default 0 if null
 
                 // Check if local file exists
                 if (!File.Exists(localFilePath))
@@ -39,12 +38,16 @@ namespace AzureStorageManager.Services
                         blobItem.Name,
                         "",                 // localHash
                         remoteMD5 ?? "",
-                        "LocalFileMissing"
+                        "LocalFileMissing",
+                        "",                 // localPath (empty since file doesn't exist)
+                        remotePath,
+                        fileSize
                     ));
                     continue;
                 }
 
                 string localMD5 = FileHashUtility.CalculateMD5(localFilePath);
+                long localFileSize = new FileInfo(localFilePath).Length;
 
                 // Only set the metadata if remoteMD5 doesn't exist or is empty
                 if (string.IsNullOrEmpty(remoteMD5))
@@ -65,29 +68,66 @@ namespace AzureStorageManager.Services
                     blobItem.Name,
                     localMD5,
                     remoteMD5 ?? "",
-                    status
-                ));
+                    status,
+                    localFilePath,
+                    remotePath,
+                    localFileSize                ));
+                
+                // Keep track of processed local files
+                processedLocalFiles.Add(blobItem.Name);
             }
-
-            // Generate timestamp for report filenames
+            
+            // Now scan local directory to find files that don't exist in Azure
+            if (Directory.Exists(localDirectory))
+            {
+                try
+                {
+                    // Get all files in the local directory (including subdirectories)
+                    var localFiles = Directory.GetFiles(localDirectory, "*", SearchOption.AllDirectories);
+                    
+                    foreach (var localFilePath in localFiles)
+                    {
+                        // Get the relative path from the local directory
+                        string relativePath = Path.GetRelativePath(localDirectory, localFilePath);
+                        
+                        // Skip if we've already processed this file (it exists in Azure)
+                        if (processedLocalFiles.Contains(relativePath))
+                            continue;
+                        
+                        // If we reach here, this is a local-only file
+                        string localMD5 = FileHashUtility.CalculateMD5(localFilePath);
+                        long localFileSize = new FileInfo(localFilePath).Length;
+                        
+                        fileMetadataList.Add(new FileMetadata(
+                            relativePath,
+                            localMD5,
+                            "", // No remote hash since file doesn't exist in Azure
+                            "AzureBlobMissing", // Status indicating file is missing in Azure
+                            localFilePath,
+                            "", // No remote path since file doesn't exist in Azure
+                            localFileSize
+                        ));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Warning: Error scanning local directory: {ex.Message}");
+                }
+            }
+            
+            // Generate timestamp for report filename
             string timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
-            string directoryPath = Path.GetDirectoryName(csvFileName) ?? Directory.GetCurrentDirectory();
+            string directoryPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop); // Save to Desktop for easier access
+            
+            // Create a single comprehensive report with a clearer name
+            string reportFileName = Path.Combine(directoryPath, $"AzureStorageReport_{timestamp}.csv");
+            CsvExporter.ExportToCsv(fileMetadataList, reportFileName);
 
-            // Create full report
-            string fullReportFileName = Path.Combine(directoryPath, $"FullReport_{timestamp}.csv");
-            CsvExporter.ExportToCsv(fileMetadataList, fullReportFileName);
-
-            // Create mismatches-only report
-            var mismatchesOnly = fileMetadataList
-                .Where(f => !string.Equals(f.Status, "Match", StringComparison.OrdinalIgnoreCase))
-                .ToList();
-
-            string mismatchesReportFileName = Path.Combine(directoryPath, $"MismatchesOnlyReport_{timestamp}.csv");
-            CsvExporter.ExportToCsv(mismatchesOnly, mismatchesReportFileName);
-
+            // Print colored success message
+            Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine("Verification complete.");
-            Console.WriteLine($"Full report saved to {fullReportFileName}");
-            Console.WriteLine($"Mismatches-only report saved to {mismatchesReportFileName}");
+            Console.WriteLine($"Comprehensive report saved to: {reportFileName}");
+            Console.ResetColor();
         }
 
         public async Task CopyAndVerifyBlobsAsync(string localDirectory, string csvFileName)
