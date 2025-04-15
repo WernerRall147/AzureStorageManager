@@ -1,0 +1,46 @@
+using System;
+using System.IO;
+using System.Net;
+using System.Text;
+using System.Security.Cryptography;
+
+// This patch removes the prompt for "Enter the folder path within the Azure File Share" 
+// To use this patch, apply it to the Program.cs file in the following location:
+// Find the section in VerifyFileIntegrityAsync() where it prompts the user for the file share path
+// And replace it with this version that only asks for the share name
+
+// Look for this code section (around line 630) in your Program.cs file:
+/*
+                else if (choice == "2")
+                {
+                    // File Share
+                    Console.Write("Enter your Azure File Share Name: ");
+                    string fileShareName = Console.ReadLine() ?? "";
+                    Console.WriteLine($"[INFO] Using Azure File Share: {fileShareName}");
+
+                    Console.Write("Enter the folder path within the Azure File Share (e.g., folder\\subfolder): ");
+                    string azureFolderPath = Console.ReadLine() ?? "";
+                    Console.WriteLine($"[INFO] Using folder path within share: {(string.IsNullOrEmpty(azureFolderPath) ? "root directory" : azureFolderPath)}");
+
+                    Console.WriteLine("[INFO] Connecting to File Share service...");
+                    var shareClientOptions = new ShareClientOptions();
+*/
+
+// And replace it with:
+/*
+                else if (choice == "2")
+                {
+                    // File Share
+                    Console.Write("Enter your Azure File Share Name: ");
+                    string fileShareName = Console.ReadLine() ?? "";
+                    Console.WriteLine($"[INFO] Using Azure File Share: {fileShareName}");
+
+                    // We've removed the folder path prompt to make the experience consistent with blob storage
+                    Console.WriteLine("[INFO] Using root directory of the file share by default");
+
+                    Console.WriteLine("[INFO] Connecting to File Share service...");
+                    var shareClientOptions = new ShareClientOptions();
+*/
+
+// This change will make the File Share experience consistent with the blob storage option
+// by removing the extra folder path prompt.

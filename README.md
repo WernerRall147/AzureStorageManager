@@ -61,7 +61,7 @@
 
 ## Implemented Features
 
-### Recently Implemented (April 2025 Update)
+### April 2025 Update
 
 1. ✅ **Enhanced User Interface**  
    - Added professional application icon for better visual identity
@@ -88,33 +88,46 @@
    - Fixed thread synchronization issues when displaying dialogs
    - Added fallback mechanisms for directory selection when GUI dialogs fail
 
-1. ✅ **Headers for the CSV File**  
-   - Added descriptive headers to the CSV report (e.g., `FileName`, `LocalHash`, `RemoteHash`, `Status`).
-   - CSV reports now include headers for better readability and data analysis.
+6. ✅ **Progress Indicator Improvements**
+   - Fixed progress indicator task cancellation to properly terminate after completion
+   - Application now correctly returns to the main menu after uploads finish
+   - Improved stability during long-running operations
 
-2. ✅ **Pop-ups for User Input**  
-   - Replaced command-line prompts with GUI pop-ups for directory selection.
-   - Implemented using Windows Forms dialogs for a more user-friendly experience.
+7. ✅ **Enhanced Connection Status Visibility**
+   - Added connection status bar to all operations showing storage account, authentication method, and container
+   - Consistent visibility of connection state across the entire application
+   - Better user awareness of current connection context
 
-3. ✅ **Check if MD5 is Written to Azure**  
-   - Added functionality to verify if the MD5 hash is present in Azure metadata.
-   - Tool can now update metadata with correct hashes when missing or incorrect.
+8. ✅ **Improved File Integrity Reporting**
+   - Enhanced file comparison logic to show matching files on the same report row
+   - Files with identical names and hash values now appear together instead of separately
+   - More concise and easier-to-understand reports for file integrity verification
 
-4. ✅ **"Enter to Exit" with Completion Message**  
-   - Added clear prompts for user interaction with "Press Enter to return to the main menu..."
-   - Improved command-line interface with better feedback for users.
+### Previous Updates
 
-5. ✅ **One Report for the Entire Directory**  
-   - Implemented a consolidated report feature for entire directory operations.
-   - Reports now include comprehensive details of all files in a single document.
+9. ✅ **CSV Report Enhancement**  
+   - Added descriptive headers to the CSV report (e.g., `FileName`, `LocalHash`, `RemoteHash`, `Status`)
+   - CSV reports now include headers for better readability and data analysis
 
-6. ✅ **V2: Copy Functionality**  
-   - Added the ability to copy files to Azure and download files from Azure.
-   - Integrated verification features with file transfer capabilities.
+10. ✅ **User Interface Improvements**  
+    - Replaced command-line prompts with GUI pop-ups for directory selection
+    - Implemented using Windows Forms dialogs for a more user-friendly experience
+    - Added clear prompts for user interaction with "Press Enter to return to the main menu..."
 
-7. ✅ **Verbose Output and Logging**  
-   - Implemented logging functionality with a dedicated "View Logs" menu option.
-   - Provided better feedback during operations and comprehensive error reporting.
+11. ✅ **Enhanced Azure Integration**  
+    - Added functionality to verify if the MD5 hash is present in Azure metadata
+    - Tool can now update metadata with correct hashes when missing or incorrect
+    - Implemented a consolidated report feature for entire directory operations
+
+12. ✅ **File Transfer Capabilities**  
+    - Added the ability to copy files to Azure and download files from Azure
+    - Integrated verification features with file transfer capabilities
+    - Reports now include comprehensive details of all files in a single document
+
+13. ✅ **Comprehensive Logging System**  
+    - Implemented logging functionality with a dedicated "View Logs" menu option
+    - Provided better feedback during operations and comprehensive error reporting
+    - Improved command-line interface with better contextual feedback for users
 
 ### Future Improvements
 

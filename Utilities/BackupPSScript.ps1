@@ -1,15 +1,124 @@
 ###############################################
 # Parameters - Customize these for your setup #
 ###############################################
-$tenantId           = "your-tenant-id"
-$clientId           = "your-app-registration-client-id"
-$clientSecret       = "your-app-registration-client-secret"
-$proxyUrl           = "http://your.proxy.address:port"  # e.g. http://proxy.company.com:8080
+param(
+    [Parameter(Mandatory=$false)]
+    [string]$tenantId = "your-tenant-id",
+    
+    [Parameter(Mandatory=$false)]
+    [string]$clientId = "your-app-registration-client-id",
+    
+    [Parameter(Mandatory=$false)]
+    [string]$clientSecret = "your-app-registration-client-secret",
+    
+    [Parameter(Mandatory=$false)]
+    [string]$proxyUrl = "",
+    
+    [Parameter(Mandatory=$false)]
+    [string]$storageAccountName = "yourstorageaccount",
+    
+    [Parameter(Mandatory=$false)]
+    [string]$shareName = "yourshare",
+    
+    [Parameter(Mandatory=$false)]
+    [string]$localFolder = "",
+    
+    [Parameter(Mandatory=$false)]
+    [string]$csvOutputPath = ""
+)
 
-$storageAccountName = "yourstorageaccount"
-$shareName          = "yourshare"  # The name of your Azure file share
-$localFolder        = "C:\Path\To\LocalFolder"  # On-prem folder containing files
-$csvOutputPath      = "C:\Path\To\Report.csv"
+# Default values for non-supplied parameters
+if ([string]::IsNullOrEmpty($localFolder)) {
+    $localFolder = Join-Path $PSScriptRoot "LocalFiles"
+    Write-Output "Using default local folder: $localFolder"
+}
+
+if ([string]::IsNullOrEmpty($csvOutputPath)) {
+    $csvOutputPath = Join-Path $PSScriptRoot "AzureStorageReport_$(Get-Date -Format 'yyyyMMdd_HHmmss').csv"
+    Write-Output "Using default report path: $csvOutputPath"
+}
+
+# Check for secrets in environment variables if not provided directly
+if ($tenantId -eq "your-tenant-id" -or [string]::IsNullOrEmpty($tenantId)) {
+    $tenantId = $env:AZURE_TENANT_ID
+    Write-Output "Using tenant ID from environment variable: $($tenantId.Substring(0,3))***"
+}
+
+if ($clientId -eq "your-app-registration-client-id" -or [string]::IsNullOrEmpty($clientId)) {
+    $clientId = $env:AZURE_CLIENT_ID
+    Write-Output "Using client ID from environment variable: $($clientId.Substring(0,3))***"
+}
+
+if ($clientSecret -eq "your-app-registration-client-secret" -or [string]::IsNullOrEmpty($clientSecret)) {
+    $clientSecret = $env:AZURE_CLIENT_SECRET
+    Write-Output "Using client secret from environment variable"
+}
+
+# Configuration validation
+$configValid = $true
+if ([string]::IsNullOrEmpty($tenantId) -or $tenantId -eq "your-tenant-id") {
+    Write-Error "Tenant ID is required. Set parameter -tenantId or environment variable AZURE_TENANT_ID"
+    $configValid = $false
+}
+
+if ([string]::IsNullOrEmpty($clientId) -or $clientId -eq "your-app-registration-client-id") {
+    Write-Error "Client ID is required. Set parameter -clientId or environment variable AZURE_CLIENT_ID"
+    $configValid = $false
+}
+
+if ([string]::IsNullOrEmpty($clientSecret) -or $clientSecret -eq "your-app-registration-client-secret") {
+    Write-Error "Client Secret is required. Set parameter -clientSecret or environment variable AZURE_CLIENT_SECRET"
+    $configValid = $false
+}
+
+if ([string]::IsNullOrEmpty($storageAccountName) -or $storageAccountName -eq "yourstorageaccount") {
+    Write-Error "Storage Account Name is required. Set parameter -storageAccountName"
+    $configValid = $false
+}
+
+if ([string]::IsNullOrEmpty($shareName) -or $shareName -eq "yourshare") {
+    Write-Error "Share Name is required. Set parameter -shareName"
+    $configValid = $false
+}
+
+if (-not $configValid) {
+    Write-Error "Invalid configuration. Please fix the issues and try again."
+    exit 1
+}
+
+# Create local folder if it doesn't exist
+if (-not (Test-Path $localFolder)) {
+    try {
+        New-Item -Path $localFolder -ItemType Directory -Force | Out-Null
+        Write-Output "Created local folder: $localFolder"
+    }
+    catch {
+        Write-Error "Failed to create local folder: $_"
+        exit 1
+    }
+}
+
+# Ensure directory for CSV report exists
+$reportDirectory = Split-Path -Parent $csvOutputPath
+if (-not (Test-Path $reportDirectory)) {
+    try {
+        New-Item -Path $reportDirectory -ItemType Directory -Force | Out-Null
+        Write-Output "Created report directory: $reportDirectory"
+    }
+    catch {
+        Write-Error "Failed to create report directory: $_"
+        exit 1
+    }
+}
+
+# Import required assemblies
+try {
+    Add-Type -AssemblyName System.Web
+}
+catch {
+    Write-Error "Failed to load System.Web assembly: $_"
+    exit 1
+}
 
 #####################################################
 # Function: Authenticate with Azure AD to get token #
@@ -31,159 +140,34 @@ function Get-AzureADToken {
     }
 
     Write-Output "Authenticating to Azure AD..."
-    $tokenResponse = Invoke-RestMethod -Method Post -Uri $tokenUrl -Body $body -Proxy $proxy
-    return $tokenResponse.access_token
-}
-
-############################################################
-# Function: Build the Azure File URL from a relative path  #
-############################################################
-function Get-AzureFileUrl {
-    param(
-        [string]$storageAccountName,
-        [string]$shareName,
-        [string]$relativePath
-    )
-    # Replace backslashes with forward slashes and URL-encode each segment.
-    $pathParts    = $relativePath -split "[\\\/]"
-    $encodedParts = $pathParts | ForEach-Object { [System.Web.HttpUtility]::UrlEncode($_) }
-    $encodedPath  = $encodedParts -join '/'
-    return "https://$storageAccountName.file.core.windows.net/$shareName/$encodedPath"
-}
-
-#########################################################
-# Function: Get Azure File Metadata (via HEAD request)  #
-#########################################################
-function Get-AzureFileMetadata {
-    param(
-        [string]$fileUrl,
-        [string]$accessToken,
-        [string]$proxy
-    )
-    $headers = @{
-        "Authorization" = "Bearer $accessToken"
-        "x-ms-date"     = (Get-Date).ToUniversalTime().ToString("R")
-        "x-ms-version"  = "2021-04-10"
-    }
     try {
-        $response = Invoke-WebRequest -Uri $fileUrl -Method Head -Headers $headers -Proxy $proxy -ErrorAction Stop
-        return $response.Headers
+        $webRequestParams = @{
+            Method = "Post"
+            Uri = $tokenUrl
+            Body = $body
+            ErrorAction = "Stop"
+        }
+        
+        if (-not [string]::IsNullOrEmpty($proxy)) {
+            Write-Output "Using proxy: $proxy"
+            $webRequestParams.Add("Proxy", $proxy)
+        }
+        
+        $tokenResponse = Invoke-RestMethod @webRequestParams
+        Write-Output "Authentication successful"
+        return $tokenResponse.access_token
     }
     catch {
-        # If not found or any error, return $null.
-        return $null
+        Write-Error "Authentication failed: $_"
+        
+        # Check for common errors and provide more guidance
+        if ($_.Exception.Response.StatusCode -eq 401) {
+            Write-Error "Unauthorized: Check that your tenantId, clientId, and clientSecret are correct"
+        }
+        elseif ($_.Exception.Response.StatusCode -eq 403) {
+            Write-Error "Forbidden: The service principal doesn't have the required permissions"
+        }
+        
+        throw
     }
 }
-
-###############################################################
-# Function: Update Azure File Metadata with MD5 (via PUT)      #
-###############################################################
-function Update-AzureFileMetadata {
-    param(
-        [string]$fileUrl,
-        [string]$accessToken,
-        [string]$md5Hash,
-        [string]$proxy
-    )
-    # Append ?comp=metadata to update only the metadata.
-    $metadataUrl = "$fileUrl?comp=metadata"
-    $headers = @{
-        "Authorization"  = "Bearer $accessToken"
-        "x-ms-date"      = (Get-Date).ToUniversalTime().ToString("R")
-        "x-ms-version"   = "2021-04-10"
-        "x-ms-meta-md5"  = $md5Hash
-        "Content-Length" = "0"
-    }
-    try {
-        Invoke-WebRequest -Uri $metadataUrl -Method Put -Headers $headers -Proxy $proxy -ErrorAction Stop
-        return $true
-    }
-    catch {
-        Write-Error "Failed to update metadata for $fileUrl: $_"
-        return $false
-    }
-}
-
-#########################################
-# Main Script: Process and Compare Files #
-#########################################
-
-# 1. Authenticate and get an access token.
-$accessToken = Get-AzureADToken -tenantId $tenantId -clientId $clientId -clientSecret $clientSecret -proxy $proxyUrl
-
-# 2. Prepare a report array.
-$report = @()
-
-Write-Output "Processing local files in $localFolder..."
-# Get all files recursively from the on-prem folder.
-$localFiles = Get-ChildItem -Path $localFolder -File -Recurse
-foreach ($file in $localFiles) {
-    # Compute the relative path (so we can match Azure’s folder structure).
-    $relativePath = $file.FullName.Substring($localFolder.Length).TrimStart("\")
-    
-    # Compute MD5 hash for the file.
-    $fileHashObj = Get-FileHash -Path $file.FullName -Algorithm MD5
-    $localMD5    = $fileHashObj.Hash
-
-    # Build the corresponding Azure File URL.
-    $azureFileUrl = Get-AzureFileUrl -storageAccountName $storageAccountName -shareName $shareName -relativePath $relativePath
-
-    # 3. Try to get metadata for the Azure file.
-    $azureHeaders = Get-AzureFileMetadata -fileUrl $azureFileUrl -accessToken $accessToken -proxy $proxyUrl
-
-    $azureMD5 = ""
-    $status   = ""
-    if ($azureHeaders -eq $null) {
-        # File not found in Azure.
-        $status = "Not Found in Azure"
-    }
-    else {
-        # Check if MD5 metadata is already present.
-        if ($azureHeaders["x-ms-meta-md5"]) {
-            $azureMD5 = $azureHeaders["x-ms-meta-md5"]
-        }
-        elseif ($azureHeaders["Content-MD5"]) {
-            # In some cases the file may have a Content-MD5 header.
-            $azureMD5 = $azureHeaders["Content-MD5"]
-        }
-
-        if ($azureMD5) {
-            if ($azureMD5 -eq $localMD5) {
-                $status = "Match"
-            }
-            else {
-                $status = "Mismatch"
-            }
-        }
-        else {
-            $status = "No MD5 metadata present"
-        }
-
-        # 4. Update the Azure file’s metadata with the computed MD5.
-        $updateSuccess = Update-AzureFileMetadata -fileUrl $azureFileUrl -accessToken $accessToken -md5Hash $localMD5 -proxy $proxyUrl
-        if ($updateSuccess) {
-            # After a successful update, assume the Azure MD5 now equals the local MD5.
-            $azureMD5 = $localMD5
-            $status   = "Updated"
-        }
-        else {
-            $status = "Update Failed"
-        }
-    }
-
-    # 5. Build the report entry.
-    $reportItem = [PSCustomObject]@{
-        FilePath      = $relativePath
-        LocalFullPath = $file.FullName
-        FileSize      = $file.Length
-        LocalMD5      = $localMD5
-        AzureMD5      = $azureMD5
-        Status        = $status
-    }
-    $report += $reportItem
-    Write-Output "Processed: $relativePath - Status: $status"
-}
-
-# 6. Export the report to CSV.
-$report | Export-Csv -Path $csvOutputPath -NoTypeInformation -Encoding UTF8
-Write-Output "CSV report saved to $csvOutputPath"

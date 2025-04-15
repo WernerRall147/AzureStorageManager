@@ -515,8 +515,8 @@ namespace AzureStorageManager
                 Console.WriteLine("Choose Storage Type:");
                 Console.WriteLine("1. Blob Storage");
                 Console.WriteLine("2. File Share");
-                string choice = Console.ReadLine() ?? "";
-                Console.WriteLine($"[INFO] Selected storage type option: {choice}"); Console.WriteLine("[INFO] Opening folder dialog to select local directory...");
+                string choice = Console.ReadLine() ?? "";                Console.WriteLine($"[INFO] Selected storage type option: {choice}"); 
+                Console.WriteLine("[INFO] Opening folder dialog to select local directory...");
                 string localDirectory = GetDirectoryFromDialog();
                 if (string.IsNullOrEmpty(localDirectory))
                 {
@@ -633,18 +633,16 @@ namespace AzureStorageManager
                         Console.WriteLine($"[ERROR] Failed to connect to Blob storage: {ex.Message}");
                         Console.WriteLine($"[DEBUG] Exception details: {ex}");
                     }
-                }
-                else if (choice == "2")
+                }                else if (choice == "2")
                 {
                     // File Share
                     Console.Write("Enter your Azure File Share Name: ");
                     string fileShareName = Console.ReadLine() ?? "";
                     Console.WriteLine($"[INFO] Using Azure File Share: {fileShareName}");
 
-                    Console.Write("Enter the folder path within the Azure File Share (e.g., folder\\subfolder): ");
-                    string azureFolderPath = Console.ReadLine() ?? "";
-                    Console.WriteLine($"[INFO] Using folder path within share: {(string.IsNullOrEmpty(azureFolderPath) ? "root directory" : azureFolderPath)}");
-
+                    // We already have the local directory from earlier, don't ask again
+                    Console.WriteLine($"[INFO] Using previously selected local directory: {localDirectory}");
+                    
                     Console.WriteLine("[INFO] Connecting to File Share service...");
                     var shareClientOptions = new ShareClientOptions();
                     if (_httpClient != null)
@@ -654,20 +652,46 @@ namespace AzureStorageManager
                     }
 
                     try
-                    {
-                        shareClientOptions.AddPolicy(new FileRequestIntentPolicy(), HttpPipelinePosition.PerCall); Console.WriteLine($"[INFO] Creating connection to {storageAccountName}.file.core.windows.net");
+                    {                        shareClientOptions.AddPolicy(new FileRequestIntentPolicy(), HttpPipelinePosition.PerCall); Console.WriteLine($"[INFO] Creating connection to {storageAccountName}.file.core.windows.net");
                         if (_credential == null)
                         {
                             Console.WriteLine("[ERROR] Azure credentials are not initialized. Please run the credentials initialization first.");
                             return;
-                        }
-                        var shareServiceClient = new ShareServiceClient(new Uri($"https://{storageAccountName}.file.core.windows.net"), _credential, shareClientOptions);
+                        }                        var shareServiceClient = new ShareServiceClient(new Uri($"https://{storageAccountName}.file.core.windows.net"), _credential, shareClientOptions);
                         Console.WriteLine("[SUCCESS] Successfully created File Share service client");
 
                         Console.WriteLine($"[INFO] Instantiating FileShareService for share '{fileShareName}'");
-                        var fileShareService = new FileShareService($"https://{storageAccountName}.file.core.windows.net", fileShareName, _credential, shareClientOptions);
+                        var fileShareService = new AzureStorageManager.Services.FileShareService($"https://{storageAccountName}.file.core.windows.net", fileShareName, _credential, shareClientOptions);
+                        
+                        // Allow the user to browse and select a directory within the Azure File Share
+                        Console.WriteLine("[INFO] Preparing to browse Azure File Share directories...");
+                        Console.WriteLine("You'll be able to select where in the Azure File Share to verify files.");
+                        Console.WriteLine("Press any key to continue to the directory browser...");
+                        Console.ReadKey(true);
+                        
+                        string azureDirectoryPath = "";
+                        try
+                        {
+                            azureDirectoryPath = await fileShareService.BrowseAndSelectDirectoryAsync();
+                            if (string.IsNullOrEmpty(azureDirectoryPath))
+                            {
+                                Console.WriteLine("[INFO] No Azure directory selected or operation cancelled. Using root directory.");
+                            }
+                            else
+                            {
+                                Console.WriteLine($"[INFO] Selected Azure directory: /{azureDirectoryPath}");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[WARNING] Error browsing Azure directories: {ex.Message}. Using root directory instead.");
+                            Console.WriteLine($"[DEBUG] {ex}");
+                            azureDirectoryPath = "";
+                        }
+                        
                         string reportFileName = $"FileShareReport_{Path.GetFileName(localDirectory)}.csv";
-                        Console.WriteLine($"[INFO] Report will be saved as: {reportFileName}"); Console.WriteLine("[INFO] Starting verification of local files against Azure File Share...");
+                        Console.WriteLine($"[INFO] Report will be saved as: {reportFileName}"); 
+                        Console.WriteLine($"[INFO] Starting verification of local files against Azure File Share{(string.IsNullOrEmpty(azureDirectoryPath) ? "" : $" in /{azureDirectoryPath}")}...");
                         Console.WriteLine("[INFO] This process may take some time depending on the number of files...");
 
                         // Create progress spinner with cancellation support
@@ -680,7 +704,7 @@ namespace AzureStorageManager
                         try
                         {
                             // Run the actual verification process
-                            await fileShareService.ListAndVerifyFilesAsync(localDirectory, reportFileName);
+                            await fileShareService.ListAndVerifyFilesAsync(localDirectory, reportFileName, azureDirectoryPath);
 
                             // Stop the progress spinner
                             Utilities.ProgressIndicator.StopProgress(
@@ -698,11 +722,23 @@ namespace AzureStorageManager
                             Utilities.ProgressIndicator.StopProgress(cts, progressTask, "[ERROR] Verification process failed");
                             throw; // Re-throw the exception to be handled by outer catch
                         }
+                    }                    catch (UnauthorizedAccessException ex)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine($"[ERROR] {ex.Message}");
+                        Console.ResetColor();
+                        
+                        // Log the full exception details but don't display to user
+                        Logger.LogError($"Authorization exception details: {ex}");
                     }
                     catch (Exception ex)
                     {
+                        Console.ForegroundColor = ConsoleColor.Red;
                         Console.WriteLine($"[ERROR] Failed to connect to File Share: {ex.Message}");
-                        Console.WriteLine($"[DEBUG] Exception details: {ex}");
+                        Console.ResetColor();
+                        
+                        // Only show detailed exception info in debug logs
+                        Logger.LogError($"Exception details: {ex}");
                     }
                 }
                 else
@@ -1419,14 +1455,15 @@ namespace AzureStorageManager
                     "certificate" => "Certificate Authentication",
                     "clientsecret" => "Client Secret Authentication",
                     "prompt" => "Prompt for Credentials When Needed",
-                    _ => "Auto-detect"
-                };
+                    _ => "Auto-detect"                };
                 Console.WriteLine($"9. Authentication Method: {authDisplayValue}");
+                
+                Console.WriteLine($"10. Test Azure Connectivity");
 
-                Console.WriteLine("\n10. Return to Main Menu");
+                Console.WriteLine("\n11. Return to Main Menu");
 
                 Console.WriteLine("\n===================================================");
-                Console.Write("Enter setting number to change (1-10): ");
+                Console.Write("Enter setting number to change (1-11): ");
 
                 string? choice = Console.ReadLine()?.Trim();
 
@@ -1455,11 +1492,14 @@ namespace AzureStorageManager
                         break;
                     case "8":
                         ConfigureConnectionTimeout();
-                        break;
-                    case "9":
+                        break;                    case "9":
                         ConfigureAuthenticationPreference();
                         break;
                     case "10":
+                        // Run the connectivity test using our synchronous wrapper
+                        Utilities.ConnectivityTestRunner.RunConnectivityTest();
+                        break;
+                    case "11":
                         exitSettings = true;
                         Console.WriteLine("Returning to main menu...");
                         break;
