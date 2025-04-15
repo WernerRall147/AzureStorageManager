@@ -512,3 +512,5 @@ C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\win-x64\zh-Han
 C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\win-x64\zh-Hant\System.Windows.Forms.Design.resources.dll
 C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\win-x64\zh-Hant\System.Windows.Forms.Primitives.resources.dll
 C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\win-x64\zh-Hant\System.Windows.Forms.resources.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\win-x64\Azure.ResourceManager.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Release\net9.0-windows\win-x64\Azure.ResourceManager.Storage.dll

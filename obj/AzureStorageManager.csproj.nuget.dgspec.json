@@ -54,6 +54,14 @@
               "target": "Package",
               "version": "[1.13.1, )"
             },
+            "Azure.ResourceManager": {
+              "target": "Package",
+              "version": "[1.13.0, )"
+            },
+            "Azure.ResourceManager.Storage": {
+              "target": "Package",
+              "version": "[1.4.0, )"
+            },
             "Azure.Storage.Blobs": {
               "target": "Package",
               "version": "[12.22.2, )"

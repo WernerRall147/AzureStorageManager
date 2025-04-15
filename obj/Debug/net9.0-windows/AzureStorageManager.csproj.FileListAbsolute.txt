@@ -41,6 +41,8 @@ C:\Users\weral\Git\AzureStorageManager\bin\Debug\net9.0-windows\AzureStorageMana
 C:\Users\weral\Git\AzureStorageManager\bin\Debug\net9.0-windows\AzureStorageManager.pdb
 C:\Users\weral\Git\AzureStorageManager\bin\Debug\net9.0-windows\Azure.Core.dll
 C:\Users\weral\Git\AzureStorageManager\bin\Debug\net9.0-windows\Azure.Identity.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Debug\net9.0-windows\Azure.ResourceManager.dll
+C:\Users\weral\Git\AzureStorageManager\bin\Debug\net9.0-windows\Azure.ResourceManager.Storage.dll
 C:\Users\weral\Git\AzureStorageManager\bin\Debug\net9.0-windows\Azure.Storage.Blobs.dll
 C:\Users\weral\Git\AzureStorageManager\bin\Debug\net9.0-windows\Azure.Storage.Common.dll
 C:\Users\weral\Git\AzureStorageManager\bin\Debug\net9.0-windows\Azure.Storage.Files.Shares.dll
