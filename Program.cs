@@ -47,21 +47,19 @@ namespace AzureStorageManager
                 Console.Clear();
                 DisplayMainMenu();
 
-                string choice = Console.ReadLine()?.Trim() ?? "";
-
-                switch (choice)
+                string choice = Console.ReadLine()?.Trim() ?? "";                switch (choice)
                 {
                     case "1":
-                        await VerifyFileIntegrityAsync();
+                        await CopyFilesToAzureAsync();
                         break;
                     case "2":
-                        await GenerateMD5HashesAsync();
+                        await VerifyFileIntegrityAsync();
                         break;
                     case "3":
-                        await CheckAndUpdateMetadataAsync();
+                        await GenerateMD5HashesAsync();
                         break;
                     case "4":
-                        await CopyFilesToAzureAsync();
+                        await CheckAndUpdateMetadataAsync();
                         break;
                     case "5":
                         await DownloadFilesFromAzureAsync();
@@ -116,13 +114,13 @@ namespace AzureStorageManager
                 Console.ForegroundColor = ConsoleColor.Cyan;
                 Console.WriteLine($"[PROXY] {Services.ProxyService.ProxyInfo}");
                 Console.ResetColor();
-            }
-            Console.WriteLine();
+            }            Console.WriteLine();
             Console.WriteLine("Please select an option:");
-            Console.WriteLine("1. Verify File Integrity");
-            Console.WriteLine("2. Generate MD5 Hashes for Local Files");
-            Console.WriteLine("3. Check and Update Azure Metadata");
-            Console.WriteLine("4. Copy Files to Azure"); Console.WriteLine("5. Download Files from Azure");
+            Console.WriteLine("1. Copy Files to Azure");
+            Console.WriteLine("2. Verify File Integrity"); 
+            Console.WriteLine("3. Generate MD5 Hashes for Local Files");
+            Console.WriteLine("4. Check and Update Azure Metadata");
+            Console.WriteLine("5. Download Files from Azure");
             Console.WriteLine("6. Generate Consolidated Report");
             Console.WriteLine("7. View Logs");
             Console.WriteLine("8. Settings");
@@ -494,13 +492,15 @@ private static async Task VerifyFileIntegrityAsync()
     try
     {
         // Initialize Azure credentials
-        await InitializeAzureCredentialsAsync();
-
-        // If we have a storage account connection already, ask if the user wants to use it
+        await InitializeAzureCredentialsAsync();        // If we have a storage account connection already, ask if the user wants to use it
         string storageAccountName = "";
+        bool skipStorageTypeSelection = false;
+        
         if (Models.ConnectionState.IsStorageAccountConnected)
         {
-            Console.WriteLine($"[INFO] Currently connected to: {Models.ConnectionState.StorageAccountName}");
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine(Models.ConnectionState.GetConnectionInfoString());
+            Console.ResetColor();
             Console.Write("Use current storage account connection? (yes/no): ");
             string? useCurrentResponse = Console.ReadLine()?.Trim().ToLower();
 
@@ -508,6 +508,13 @@ private static async Task VerifyFileIntegrityAsync()
             {
                 storageAccountName = Models.ConnectionState.StorageAccountName ?? "";
                 Console.WriteLine($"[INFO] Using current storage account: {storageAccountName}");
+                
+                // If we already have a storage type selected, we can skip that prompt
+                if (Models.ConnectionState.CurrentStorageType.HasValue)
+                {
+                    skipStorageTypeSelection = true;
+                    Console.WriteLine($"[INFO] Using current storage type: {(Models.ConnectionState.CurrentStorageType == Models.ConnectionState.StorageTypes.BlobStorage ? "Blob Storage" : "File Share")}");
+                }
             }
         }
 
@@ -522,10 +529,29 @@ private static async Task VerifyFileIntegrityAsync()
             Models.ConnectionState.StorageAccountName = storageAccountName;
         }
 
-        Console.WriteLine("Choose Storage Type:");
-        Console.WriteLine("1. Blob Storage");
-        Console.WriteLine("2. File Share");
-        string choice = Console.ReadLine() ?? ""; Console.WriteLine($"[INFO] Selected storage type option: {choice}");
+        string choice;
+        
+        // Only ask for storage type if we don't already have one selected
+        if (!skipStorageTypeSelection)
+        {
+            Console.WriteLine("Choose Storage Type:");
+            Console.WriteLine("1. Blob Storage");
+            Console.WriteLine("2. File Share");
+            choice = Console.ReadLine() ?? "";
+            Console.WriteLine($"[INFO] Selected storage type option: {choice}");
+            
+            // Update the storage type in the connection state
+            if (choice == "1")
+                Models.ConnectionState.CurrentStorageType = Models.ConnectionState.StorageTypes.BlobStorage;
+            else if (choice == "2")
+                Models.ConnectionState.CurrentStorageType = Models.ConnectionState.StorageTypes.FileShare;
+        }
+        else
+        {
+            // Use existing storage type choice
+            choice = Models.ConnectionState.CurrentStorageType == Models.ConnectionState.StorageTypes.BlobStorage ? "1" : "2";
+        }
+        
         Console.WriteLine("[INFO] Opening folder dialog to select local directory...");
         string localDirectory = GetDirectoryFromDialog();
         if (string.IsNullOrEmpty(localDirectory))
@@ -542,15 +568,19 @@ private static async Task VerifyFileIntegrityAsync()
         {
             Console.WriteLine("[ERROR] Storage account name is missing. Please check your input.");
             return;
-        }
-        if (choice == "1")
+        }        if (choice == "1")
         {
+            // Update storage type in connection state
+            Models.ConnectionState.CurrentStorageType = Models.ConnectionState.StorageTypes.BlobStorage;
+            
             // Check if we already have a blob container connection and ask if user wants to use it
             string blobContainerName = "";
             if (!string.IsNullOrEmpty(Models.ConnectionState.BlobContainerName) &&
                 Models.ConnectionState.StorageAccountName == storageAccountName)
             {
+                Console.ForegroundColor = ConsoleColor.Cyan;
                 Console.WriteLine($"[INFO] Currently using container: {Models.ConnectionState.BlobContainerName}");
+                Console.ResetColor();
                 Console.Write("Use current container? (yes/no): ");
                 string? useCurrentContainer = Console.ReadLine()?.Trim().ToLower();
 
@@ -643,13 +673,37 @@ private static async Task VerifyFileIntegrityAsync()
                 Console.WriteLine($"[ERROR] Failed to connect to Blob storage: {ex.Message}");
                 Console.WriteLine($"[DEBUG] Exception details: {ex}");
             }
-        }
-        else if (choice == "2")
+        }        else if (choice == "2")
         {
-            // File Share
-            Console.Write("Enter your Azure File Share Name: ");
-            string fileShareName = Console.ReadLine() ?? "";
-            Console.WriteLine($"[INFO] Using Azure File Share: {fileShareName}");
+            // Update storage type in connection state
+            Models.ConnectionState.CurrentStorageType = Models.ConnectionState.StorageTypes.FileShare;
+            
+            // Check if we already have a file share connection and ask if user wants to use it
+            string fileShareName = "";
+            if (!string.IsNullOrEmpty(Models.ConnectionState.FileShareName) &&
+                Models.ConnectionState.StorageAccountName == storageAccountName)
+            {
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.WriteLine($"[INFO] Currently using file share: {Models.ConnectionState.FileShareName}");
+                Console.ResetColor();
+                Console.Write("Use current file share? (yes/no): ");
+                string? useCurrentShare = Console.ReadLine()?.Trim().ToLower();
+
+                if (useCurrentShare == "yes" || useCurrentShare == "y")
+                {
+                    fileShareName = Models.ConnectionState.FileShareName ?? "";
+                    Console.WriteLine($"[INFO] Using current file share: {fileShareName}");
+                }
+            }
+            
+            // If no file share selected yet, prompt for one
+            if (string.IsNullOrEmpty(fileShareName))
+            {
+                Console.Write("Enter your Azure File Share Name: ");
+                fileShareName = Console.ReadLine() ?? "";
+                Console.WriteLine($"[INFO] Using Azure File Share: {fileShareName}");
+                Models.ConnectionState.FileShareName = fileShareName;
+            }
 
             // We already have the local directory from earlier, don't ask again
             Console.WriteLine($"[INFO] Using previously selected local directory: {localDirectory}");
@@ -1658,31 +1712,442 @@ private static async Task DownloadFilesFromAzureAsync()
                 spinnerPos = (spinnerPos + 1) % spinner.Length;
                 await Task.Delay(200);
             }
-        });
+        });        Console.WriteLine("[INFO] Beginning download process. This may take some time depending on file sizes...");
 
-        Console.WriteLine("[INFO] Beginning download process. This may take some time depending on file sizes...");
+        // Create cancellation token source for progress spinner
+        var cts = new CancellationTokenSource();
+        
+        // List to track failures
+        var failedFiles = new List<string>();
+        
+        // Set up concurrency limits to prevent throttling
+        int maxConcurrentDownloads = 4;
+        using var semaphore = new SemaphoreSlim(maxConcurrentDownloads);
+        var downloadTasks = new List<Task>();
 
-        // Add implementation for actual file downloading here
-        // This is a placeholder for now - in a future update, this method will be fully implemented
-        await Task.Delay(2000); // Simulate work
-
-        // For demo purposes only - simulate some activity
-        for (int i = 1; i <= 10; i++)
+        try
         {
-            await Task.Delay(500);
-            lock (lockObj)
+            if (choice == "1") // Blob Storage
             {
-                total = 10;
-                downloaded = i;
-                Console.WriteLine($"\r[INFO] Downloaded: sample_file_{i}.txt" + new string(' ', 30));
+                // Create Blob client
+                var blobClientOptions = new BlobClientOptions();
+                if (_httpClient != null)
+                {
+                    blobClientOptions.Transport = new HttpClientTransport(_httpClient);
+                }
+                
+                var blobServiceClient = new BlobServiceClient(
+                    new Uri($"https://{storageAccountName}.blob.core.windows.net"),
+                    _credential,
+                    blobClientOptions);
+                
+                // Get container name
+                string containerName = "";
+                if (!string.IsNullOrEmpty(Models.ConnectionState.BlobContainerName) && 
+                    Models.ConnectionState.StorageAccountName == storageAccountName)
+                {
+                    Console.Write($"Use current container '{Models.ConnectionState.BlobContainerName}'? (yes/no): ");
+                    string? useCurrentContainer = Console.ReadLine()?.Trim().ToLower();
+                    
+                    if (useCurrentContainer == "yes" || useCurrentContainer == "y")
+                    {
+                        containerName = Models.ConnectionState.BlobContainerName;
+                        Console.WriteLine($"[INFO] Using container: {containerName}");
+                    }
+                }
+                
+                if (string.IsNullOrEmpty(containerName))
+                {
+                    Console.Write("Enter your Azure Blob Container Name: ");
+                    containerName = Console.ReadLine() ?? "";
+                    Models.ConnectionState.BlobContainerName = containerName;
+                    Console.WriteLine($"[INFO] Using container: {containerName}");
+                }
+                
+                var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+                
+                // Check if container exists
+                if (!await containerClient.ExistsAsync())
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"[ERROR] Container '{containerName}' does not exist.");
+                    Console.ResetColor();
+                    return;
+                }
+                
+                // Get list of all blobs
+                var blobList = new List<BlobItem>();
+                await foreach (var blobItem in containerClient.GetBlobsAsync())
+                {
+                    blobList.Add(blobItem);
+                }
+                
+                lock (lockObj)
+                {
+                    total = blobList.Count;
+                }
+                
+                // Process each blob for download
+                foreach (var blobItem in blobList)
+                {
+                    await semaphore.WaitAsync();
+                    
+                    var downloadTask = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            // Get blob client
+                            var blobClient = containerClient.GetBlobClient(blobItem.Name);
+                            
+                            // Create the local directory structure if needed
+                            string localFilePath = Path.Combine(localDirectory, blobItem.Name.Replace('/', Path.DirectorySeparatorChar));
+                            string? dirPath = Path.GetDirectoryName(localFilePath);
+                            
+                            if (!string.IsNullOrEmpty(dirPath) && !Directory.Exists(dirPath))
+                            {
+                                Directory.CreateDirectory(dirPath);
+                            }
+                            
+                            // Download the blob
+                            using (var fileStream = File.Create(localFilePath))
+                            {
+                                await blobClient.DownloadToAsync(fileStream);
+                            }
+                            
+                            // Get blob properties to check for MD5 hash
+                            var properties = await blobClient.GetPropertiesAsync();
+                            
+                            // Try to get MD5 from metadata if available
+                            properties.Value.Metadata.TryGetValue("md5", out string? md5FromMetadata);
+                            
+                            // Calculate local MD5 for verification
+                            string localMD5 = FileHashUtility.CalculateMD5(localFilePath);
+                            
+                            // Compare hashes if metadata is available
+                            bool hashesMatch = false;
+                            
+                            if (!string.IsNullOrEmpty(md5FromMetadata))
+                            {
+                                // Compare the hashes
+                                hashesMatch = md5FromMetadata.Equals(localMD5, StringComparison.OrdinalIgnoreCase);
+                                
+                                if (!hashesMatch)
+                                {
+                                    Console.ForegroundColor = ConsoleColor.Yellow;
+                                    Console.WriteLine($"\r[WARNING] Hash mismatch for {blobItem.Name}" + new string(' ', 30));
+                                    Console.ResetColor();
+                                    Logger.LogWarning($"Hash mismatch when downloading {blobItem.Name}. Azure MD5: {md5FromMetadata}, Local MD5: {localMD5}");
+                                }
+                            }
+                            
+                            lock (lockObj)
+                            {
+                                downloaded++;
+                                Console.WriteLine($"\r[INFO] Downloaded: {blobItem.Name}" + new string(' ', 30));
+                            }
+                            
+                            Logger.LogInfo($"Successfully downloaded {blobItem.Name} to {localFilePath} ({blobItem.Properties.ContentLength ?? 0} bytes)");
+                        }
+                        catch (Exception ex)
+                        {
+                            lock (lockObj)
+                            {
+                                failed++;
+                                failedFiles.Add(blobItem.Name);
+                                Console.ForegroundColor = ConsoleColor.Red;
+                                Console.WriteLine($"\r[ERROR] Failed to download {blobItem.Name}: {ex.Message}" + new string(' ', 30));
+                                Console.ResetColor();
+                            }
+                            
+                            Logger.LogError($"Failed to download blob: {blobItem.Name}. Error: {ex}");
+                        }
+                        finally
+                        {
+                            semaphore.Release();
+                        }
+                    });
+                    
+                    downloadTasks.Add(downloadTask);
+                }
             }
+            else if (choice == "2") // File Share
+            {
+                // Create File Share client with appropriate options
+                var shareClientOptions = new ShareClientOptions();
+                if (_httpClient != null)
+                {
+                    shareClientOptions.Transport = new HttpClientTransport(_httpClient);
+                }
+                
+                // Add the FileRequestIntentPolicy to handle x-ms-file-request-intent header
+                shareClientOptions.AddPolicy(new FileRequestIntentPolicy(), HttpPipelinePosition.PerCall);
+                
+                var shareServiceClient = new ShareServiceClient(
+                    new Uri($"https://{storageAccountName}.file.core.windows.net"),
+                    _credential,
+                    shareClientOptions);
+                
+                // Get file share name
+                string fileShareName = "";
+                if (!string.IsNullOrEmpty(Models.ConnectionState.FileShareName) && 
+                    Models.ConnectionState.StorageAccountName == storageAccountName)
+                {
+                    Console.Write($"Use current file share '{Models.ConnectionState.FileShareName}'? (yes/no): ");
+                    string? useCurrentShare = Console.ReadLine()?.Trim().ToLower();
+                    
+                    if (useCurrentShare == "yes" || useCurrentShare == "y")
+                    {
+                        fileShareName = Models.ConnectionState.FileShareName;
+                        Console.WriteLine($"[INFO] Using file share: {fileShareName}");
+                    }
+                }
+                
+                if (string.IsNullOrEmpty(fileShareName))
+                {
+                    Console.Write("Enter your Azure File Share Name: ");
+                    fileShareName = Console.ReadLine() ?? "";
+                    Models.ConnectionState.FileShareName = fileShareName;
+                    Console.WriteLine($"[INFO] Using file share: {fileShareName}");
+                }
+                
+                var shareClient = shareServiceClient.GetShareClient(fileShareName);
+                
+                // Check if share exists using our enhanced existence check method
+                bool shareExists = await Utilities.FileShareClientExtensions.ExistsWithIntentHeaderAsync(shareClient);
+                if (!shareExists)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"[ERROR] File share '{fileShareName}' does not exist.");
+                    Console.ResetColor();
+                    return;
+                }
+                
+                // Ask user for directory path within file share
+                Console.WriteLine("[INFO] Preparing to browse Azure File Share directories...");
+                Console.WriteLine("You'll be able to select which directory in the Azure File Share to download from.");
+                Console.WriteLine("Press any key to continue to the directory browser...");
+                Console.ReadKey(true);
+                
+                // Create service
+                var fileShareService = new FileShareService(
+                    $"https://{storageAccountName}.file.core.windows.net", 
+                    fileShareName, 
+                    _credential, 
+                    shareClientOptions);
+                
+                // Browse for directory
+                string azureDirectoryPath = "";
+                try
+                {
+                    azureDirectoryPath = await fileShareService.BrowseAndSelectDirectoryAsync();
+                    if (string.IsNullOrEmpty(azureDirectoryPath))
+                    {
+                        Console.WriteLine("[INFO] No Azure directory selected or operation cancelled. Using root directory.");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[INFO] Selected Azure directory: {azureDirectoryPath}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[WARNING] Error browsing Azure directories: {ex.Message}. Using root directory instead.");
+                    Console.WriteLine($"[DEBUG] {ex}");
+                    azureDirectoryPath = "";
+                }
+                
+                // Get appropriate directory client based on the path
+                ShareDirectoryClient directoryClient;
+                if (string.IsNullOrEmpty(azureDirectoryPath))
+                {
+                    directoryClient = shareClient.GetRootDirectoryClient();
+                }
+                else
+                {
+                    directoryClient = shareClient.GetDirectoryClient(azureDirectoryPath);
+                }
+                
+                // Get all files and nested directories (recursive traversal function)
+                var fileList = new List<(ShareFileClient fileClient, string relativePath)>();
+                
+                async Task TraverseDirectoryAsync(ShareDirectoryClient currentDir, string currentPath)
+                {
+                    try
+                    {
+                        await foreach (var item in currentDir.GetFilesAndDirectoriesAsync())
+                        {
+                            if (item.IsDirectory)
+                            {
+                                // Build path for subdirectory
+                                string subDirPath = string.IsNullOrEmpty(currentPath) ? 
+                                    item.Name : 
+                                    $"{currentPath}/{item.Name}";
+                                
+                                // Get subdirectory client
+                                var subDirClient = currentDir.GetSubdirectoryClient(item.Name);
+                                
+                                // Recursively traverse subdirectory
+                                await TraverseDirectoryAsync(subDirClient, subDirPath);
+                            }
+                            else
+                            {
+                                // Build relative path for file
+                                string filePath = string.IsNullOrEmpty(currentPath) ? 
+                                    item.Name : 
+                                    $"{currentPath}/{item.Name}";
+                                
+                                // Get file client
+                                var fileClient = currentDir.GetFileClient(item.Name);
+                                
+                                // Add to list
+                                fileList.Add((fileClient, filePath));
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[WARNING] Error traversing directory {currentPath}: {ex.Message}");
+                        Logger.LogWarning($"Error traversing directory {currentPath}: {ex}");
+                    }
+                }
+                
+                // Start traversal from selected directory
+                await TraverseDirectoryAsync(directoryClient, "");
+                
+                // Update total count
+                lock (lockObj)
+                {
+                    total = fileList.Count;
+                }
+                
+                // Process each file for download
+                foreach (var (fileClient, relativePath) in fileList)
+                {
+                    await semaphore.WaitAsync();
+                    
+                    var downloadTask = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            // Create the local directory structure if needed
+                            string localFilePath = Path.Combine(localDirectory, relativePath.Replace('/', Path.DirectorySeparatorChar));
+                            string? dirPath = Path.GetDirectoryName(localFilePath);
+                            
+                            if (!string.IsNullOrEmpty(dirPath) && !Directory.Exists(dirPath))
+                            {
+                                Directory.CreateDirectory(dirPath);
+                            }
+                            
+                            // Download the file
+                            var downloadInfo = await fileClient.DownloadAsync();
+                            
+                            using (var fileStream = File.Create(localFilePath))
+                            {
+                                await downloadInfo.Value.Content.CopyToAsync(fileStream);
+                            }
+                            
+                            // Get file properties to check for MD5 hash
+                            var properties = await fileClient.GetPropertiesAsync();
+                            
+                            // Try to get MD5 from metadata if available
+                            properties.Value.Metadata.TryGetValue("md5", out string? md5FromMetadata);
+                            
+                            // Calculate local MD5 for verification
+                            string localMD5 = FileHashUtility.CalculateMD5(localFilePath);
+                            
+                            // Compare hashes if metadata is available
+                            bool hashesMatch = false;
+                            
+                            if (!string.IsNullOrEmpty(md5FromMetadata))
+                            {
+                                // Compare the hashes
+                                hashesMatch = md5FromMetadata.Equals(localMD5, StringComparison.OrdinalIgnoreCase);
+                                
+                                if (!hashesMatch)
+                                {
+                                    Console.ForegroundColor = ConsoleColor.Yellow;
+                                    Console.WriteLine($"\r[WARNING] Hash mismatch for {relativePath}" + new string(' ', 30));
+                                    Console.ResetColor();
+                                    Logger.LogWarning($"Hash mismatch when downloading {relativePath}. Azure MD5: {md5FromMetadata}, Local MD5: {localMD5}");
+                                }
+                            }
+                            
+                            lock (lockObj)
+                            {
+                                downloaded++;
+                                Console.WriteLine($"\r[INFO] Downloaded: {relativePath}" + new string(' ', 30));
+                            }
+                            
+                            Logger.LogInfo($"Successfully downloaded {relativePath} to {localFilePath} ({properties.Value.ContentLength} bytes)");
+                        }
+                        catch (Exception ex)
+                        {
+                            lock (lockObj)
+                            {
+                                failed++;
+                                failedFiles.Add(relativePath);
+                                Console.ForegroundColor = ConsoleColor.Red;
+                                Console.WriteLine($"\r[ERROR] Failed to download {relativePath}: {ex.Message}" + new string(' ', 30));
+                                Console.ResetColor();
+                            }
+                            
+                            Logger.LogError($"Failed to download file: {relativePath}. Error: {ex}");
+                        }
+                        finally
+                        {
+                            semaphore.Release();
+                        }
+                    });
+                    
+                    downloadTasks.Add(downloadTask);
+                }
+            }
+            else
+            {
+                Console.WriteLine("[ERROR] Invalid choice. Please select either option 1 or 2.");
+                return;
+            }
+            
+            // Wait for all downloads to complete
+            await Task.WhenAll(downloadTasks);
+        }
+        finally
+        {
+            // Cancel the progress spinner
+            cts.Cancel();
+            try
+            {
+                // Wait a short time for the task to respond to cancellation
+                await Task.WhenAny(progressTask, Task.Delay(1000));
+            }
+            catch { /* Ignore any exceptions during task cancellation */ }
         }
 
-        // Stop the progress spinner
-        try { progressTask.GetAwaiter().GetResult(); } catch { }
-
         var totalTime = DateTime.Now - startTime;
-        Console.WriteLine($"\r[SUCCESS] Download process completed. {downloaded} files downloaded in {totalTime.Minutes}m {totalTime.Seconds}s" + new string(' ', 30));
+        
+        if (failed > 0)
+        {
+            Console.WriteLine($"\n[WARNING] {failed} out of {total} files failed to download. Check the logs for details.");
+            
+            // Print first few failed files
+            int maxFailedToShow = Math.Min(5, failedFiles.Count);
+            Console.WriteLine("\nFailed files:");
+            for (int i = 0; i < maxFailedToShow; i++)
+            {
+                Console.WriteLine($"- {failedFiles[i]}");
+            }
+            
+            if (failedFiles.Count > maxFailedToShow)
+            {
+                Console.WriteLine($"... and {failedFiles.Count - maxFailedToShow} more. See logs for details.");
+            }
+        }
+        else
+        {
+            Console.WriteLine($"\n[SUCCESS] Download process completed successfully.");
+        }
+
+        Console.WriteLine($"[INFO] {downloaded} files downloaded in {totalTime.Minutes}m {totalTime.Seconds}s");
         Console.WriteLine($"[INFO] Files downloaded to: {localDirectory}");
     }
     catch (Exception ex)

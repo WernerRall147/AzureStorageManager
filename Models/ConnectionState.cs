@@ -24,6 +24,25 @@ namespace AzureStorageManager.Models
         public static ShareServiceClient? ShareServiceClient { get; set; }
         
         /// <summary>
+        /// Authentication method used for the current connection
+        /// </summary>
+        public static string? AuthenticationType { get; set; }
+
+        /// <summary>
+        /// Currently selected storage type (Blob or FileShare)
+        /// </summary>
+        public static StorageTypes? CurrentStorageType { get; set; }
+
+        /// <summary>
+        /// Enum for available storage types
+        /// </summary>
+        public enum StorageTypes
+        {
+            BlobStorage,
+            FileShare
+        }
+        
+        /// <summary>
         /// Resets all connection state
         /// </summary>
         public static void Reset()
@@ -34,6 +53,7 @@ namespace AzureStorageManager.Models
             FileShareFolderPath = null;
             BlobServiceClient = null;
             ShareServiceClient = null;
+            CurrentStorageType = null;
         }
         
         /// <summary>
@@ -44,6 +64,7 @@ namespace AzureStorageManager.Models
             BlobContainerName = null;
             FileShareName = null;
             FileShareFolderPath = null;
+            CurrentStorageType = null;
         }
         
         /// <summary>
@@ -51,10 +72,6 @@ namespace AzureStorageManager.Models
         /// </summary>
         public static bool IsStorageAccountConnected => !string.IsNullOrEmpty(StorageAccountName) && 
                                                        (BlobServiceClient != null || ShareServiceClient != null);
-                                                         /// <summary>
-        /// Authentication method used for the current connection
-        /// </summary>
-        public static string? AuthenticationType { get; set; }
 
         /// <summary>
         /// Returns a formatted string with the current connection status
@@ -69,6 +86,9 @@ namespace AzureStorageManager.Models
             if (!string.IsNullOrEmpty(AuthenticationType))
                 info += $" | Auth: {AuthenticationType}";
             
+            if (CurrentStorageType.HasValue)
+                info += $" | Type: {(CurrentStorageType == StorageTypes.BlobStorage ? "Blob Storage" : "File Share")}";
+            
             if (!string.IsNullOrEmpty(BlobContainerName))
                 info += $" | Container: {BlobContainerName}";
                 
@@ -77,5 +97,23 @@ namespace AzureStorageManager.Models
                 
             return info;
         }
+
+        /// <summary>
+        /// Returns true if we have an active blob storage connection with container
+        /// </summary>
+        public static bool IsBlobStorageConnected => 
+            IsStorageAccountConnected && 
+            CurrentStorageType == StorageTypes.BlobStorage && 
+            !string.IsNullOrEmpty(BlobContainerName) && 
+            BlobServiceClient != null;
+
+        /// <summary>
+        /// Returns true if we have an active file share connection
+        /// </summary>
+        public static bool IsFileShareConnected => 
+            IsStorageAccountConnected && 
+            CurrentStorageType == StorageTypes.FileShare && 
+            !string.IsNullOrEmpty(FileShareName) && 
+            ShareServiceClient != null;
     }
 }

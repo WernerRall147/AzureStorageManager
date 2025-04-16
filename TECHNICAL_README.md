@@ -1,7 +1,7 @@
 # Azure Storage Manager Tool - Technical Documentation
 
 ## Project Overview
-Azure Storage Manager is a .NET-based command-line utility for verifying file integrity between local files and Azure Blob Storage or Azure File Shares. The application is designed to run on Windows OS and provides an interface for file operations, integrity checks, and related services.
+Azure Storage Manager is a .NET-based command-line utility for file operations between local systems and Azure cloud storage. The application provides capabilities for uploading files to Azure, downloading files from Azure, and verifying file integrity through MD5 hash comparison. It's designed to run on Windows OS and provides an interface for a variety of storage operations, integrity checks, and related services.
 
 ## Technical Specifications
 
@@ -28,6 +28,29 @@ Azure Storage Manager is a .NET-based command-line utility for verifying file in
 - **Target Runtime**: win-x64
 
 ## Architecture
+
+### User Interface
+
+#### Main Menu Structure
+The application's main menu has been organized to prioritize common operations:
+1. **Copy Files to Azure** - Upload local files to Azure Blob Storage or File Shares
+2. **Verify File Integrity** - Compare local files with those in Azure using MD5 hashes
+3. **Generate MD5 Hashes for Local Files** - Calculate and display MD5 hashes for local files
+4. **Check and Update Azure Metadata** - Inspect and update missing or incorrect metadata
+5. **Download Files from Azure** - Download files from Azure Blob Storage or File Shares
+6. **Generate Consolidated Report** - Create summary reports from multiple operations
+7. **View Logs** - Access application logs for troubleshooting
+8. **Settings** - Configure application settings
+9. **Help** - Display help information
+10. **Test File Share Permissions** - Diagnose permission issues with Azure File Shares
+11. **Exit** - Exit the application
+
+#### User Experience Enhancements
+- File selection dialogs using Windows Forms for intuitive directory browsing
+- Progress indicators with spinning animations for long-running operations
+- Detailed status updates during file operations
+- Color-coded output for better visibility of important information
+- Interactive directory browsing for Azure File Shares
 
 ### Core Components
 
@@ -164,18 +187,31 @@ The application uses `appsettings.json` for storing configuration:
 
 ## File Operations
 
-### Hash Verification
+### File Operations
+
+#### Upload Operations
+- Files can be uploaded to both Azure Blob Storage and Azure File Shares
+- Directory structure is preserved during upload
+- MD5 hashes are calculated and stored as metadata with each file
+- Parallel uploads improve performance for multiple files
+- Progress tracking with detailed statistics is displayed during upload
+
+#### Download Operations
+- Files can be downloaded from both Azure Blob Storage and Azure File Shares
+- Directory structure from Azure is preserved in local filesystem
+- MD5 hash verification ensures integrity of downloaded files
+- Interactive directory browser for File Shares allows selection of specific directories
+- Parallel downloads improve performance for multiple files
+- Progress tracking with detailed statistics is displayed during download
+
+#### Hash Verification
 - MD5 hash calculation is performed by `FileHashUtility.cs`
 - Compares local file hashes with Azure storage metadata
 - Can update metadata when hashes are missing or incorrect
 
-### Chunked File Processing
+#### Chunked File Processing
 - Large files are processed in chunks to optimize memory usage
 - Chunk size is configurable through the advanced settings menu
-
-### Parallel Processing
-- Multi-threaded operations for improved performance
-- Thread count is adjustable through the application settings
 
 ## Logging System
 
