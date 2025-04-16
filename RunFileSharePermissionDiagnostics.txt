@@ -1,0 +1,37 @@
+/// <summary>
+/// Runs a diagnostic test on Azure File Share permissions to help troubleshoot access issues
+/// </summary>
+private static async Task RunFileSharePermissionDiagnostics()
+{
+    try
+    {
+        Console.WriteLine("[INFO] Initializing Azure credentials...");
+        await InitializeAzureCredentialsAsync();
+        
+        // Prompt user for storage account name
+        Console.Write("Enter your Azure Storage Account Name: ");
+        string storageAccountName = Console.ReadLine() ?? "";
+        
+        // Prompt user for file share name
+        Console.Write("Enter your Azure File Share Name: ");
+        string fileShareName = Console.ReadLine() ?? "";
+        
+        // Run the diagnostics using the proper FileShareDiagnostics class
+        await FileShareDiagnostics.RunFileSharePermissionDiagnosticsAsync(
+            _credential,
+            _httpClient,
+            storageAccountName,
+            fileShareName);
+    }
+    catch (Exception ex)
+    {
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine($"[ERROR] Failed to run file share permission diagnostics: {ex.Message}");
+        Console.ResetColor();
+        Logger.LogError($"File share diagnostics failed: {ex}");
+    }
+    
+    // Wait for user acknowledgment before returning to settings menu
+    Console.WriteLine("\nPress any key to continue...");
+    Console.ReadKey();
+}

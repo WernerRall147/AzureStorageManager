@@ -117,22 +117,55 @@ $testLogDir
 # Main execution
 Write-Host "Starting log collection for test: $TestName"
 
+# Start transcript to capture all terminal output (including verbose/debug)
+$transcriptPath = "$testLogDir\FullTerminalOutput.txt"
+Start-Transcript -Path $transcriptPath -Append | Out-Null
+
 try {
     Get-SystemDetails
     Get-ApplicationLogs
     Get-NetworkDetails
-    
+
+    # Copy all CSV, log, and report files from workspace (recursive)
+    Write-Host "Collecting all CSV, log, and report files from workspace..."
+    $workspaceRoot = Split-Path -Parent $PSScriptRoot
+    Get-ChildItem -Path $workspaceRoot -Include *.csv,*.log,*.txt,*.err,*.dmp,*.md -Recurse -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -notlike "$testLogDir*" } |
+        Copy-Item -Destination "$testLogDir\AppLogs" -Force -ErrorAction SilentlyContinue
+
+    # Copy appsettings.json and any config files
+    if (Test-Path "$workspaceRoot\appsettings.json") {
+        Copy-Item "$workspaceRoot\appsettings.json" "$testLogDir\AppLogs" -Force
+    }
+    Get-ChildItem -Path $workspaceRoot -Include *.config,*.settings -Recurse -ErrorAction SilentlyContinue |
+        Copy-Item -Destination "$testLogDir\AppLogs" -Force -ErrorAction SilentlyContinue
+
+    # Copy AzureStorageManager executable and version info
+    $exePath = Get-ChildItem -Path "$workspaceRoot\bin" -Include AzureStorageManager.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($exePath) {
+        Copy-Item $exePath.FullName "$testLogDir\AppLogs" -Force
+        $ver = (Get-Item $exePath.FullName).VersionInfo | Out-String
+        $ver | Out-File "$testLogDir\AppLogs\AzureStorageManagerExeVersion.txt"
+    }
+
+    # Save the script output/errors
+    $scriptLog = "$testLogDir\LogCollectorScriptOutput.txt"
+    Get-Content $transcriptPath | Out-File $scriptLog
+
     # Create a placeholder summary (to be filled in manually)
     Create-TestSummary -TestDescription "Please fill in test description" -Result "Please fill in test result" -Notes "Please add any observations here"
-    
+
     # Create a ZIP file of all logs
     $zipFile = "$LogDirectory\${TestName}_${timestamp}.zip"
     Compress-Archive -Path $testLogDir -DestinationPath $zipFile -Force
-    
+
     Write-Host "Log collection complete. Files saved to:"
     Write-Host " - Raw logs: $testLogDir"
     Write-Host " - ZIP file: $zipFile"
 }
 catch {
     Write-Host "Error collecting logs: $_" -ForegroundColor Red
+}
+finally {
+    Stop-Transcript | Out-Null
 }

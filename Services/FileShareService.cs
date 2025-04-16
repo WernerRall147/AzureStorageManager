@@ -9,6 +9,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Net;
+using Azure;
 
 namespace AzureStorageManager.Services
 {
@@ -16,26 +17,92 @@ namespace AzureStorageManager.Services
     {
         private readonly ShareServiceClient _shareServiceClient;
         private readonly ShareClient _shareClient;
-
-        /// <summary>
+        private readonly string _fileShareName;        /// <summary>
         /// Constructor without custom ShareClientOptions.
         /// </summary>
         public FileShareService(string serviceUri, string fileShareName, TokenCredential credential)
         {
-            _shareServiceClient = new ShareServiceClient(new Uri(serviceUri), credential);
+            _fileShareName = fileShareName;
+            
+            // Create options with FileRequestIntentPolicy to ensure x-ms-file-request-intent header is sent
+            var options = new ShareClientOptions();
+            options.AddPolicy(new Utilities.FileRequestIntentPolicy(), HttpPipelinePosition.PerCall);
+            
+            _shareServiceClient = new ShareServiceClient(new Uri(serviceUri), credential, options);
             _shareClient = _shareServiceClient.GetShareClient(fileShareName);
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Constructor that accepts ShareClientOptions, allowing custom pipeline policies.
-        /// </summary>
+        /// </summary>        
         public FileShareService(string serviceUri, string fileShareName, TokenCredential credential, ShareClientOptions options)
         {
+            _fileShareName = fileShareName;
+            
+            // Ensure the FileRequestIntentPolicy is added to handle the x-ms-file-request-intent header requirement
+            options.AddPolicy(new Utilities.FileRequestIntentPolicy(), HttpPipelinePosition.PerCall);
+            
             _shareServiceClient = new ShareServiceClient(new Uri(serviceUri), credential, options);
             _shareClient = _shareServiceClient.GetShareClient(fileShareName);
         }
 
         /// <summary>
+        /// Verifies that the file share exists and creates it if needed
+        /// </summary>
+        /// <param name="createIfNotExists">Whether to create the file share if it doesn't exist</param>
+        /// <returns>True if the share exists or was created, False if the share doesn't exist and wasn't created</returns>
+        public async Task<bool> EnsureShareExistsAsync(bool createIfNotExists = false)
+        {
+            try
+            {
+                // Check if the file share exists using our enhanced method that handles header requirements properly
+                var exists = await Utilities.FileShareClientExtensions.ExistsWithIntentHeaderAsync(_shareClient);
+                
+                if (!exists && createIfNotExists)
+                {
+                    Console.WriteLine($"[INFO] File share '{_fileShareName}' does not exist. Creating it now...");
+                    await _shareClient.CreateAsync();
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"[SUCCESS] File share '{_fileShareName}' created successfully");
+                    Console.ResetColor();
+                    return true;
+                }
+                
+                return exists;
+            }
+            catch (Azure.RequestFailedException ex) when (ex.Status == 403)
+            {
+                // Handle authorization errors with a more user-friendly message
+                string storageAccount = _shareServiceClient.Uri.Host.Split('.')[0];
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"[ERROR] Authorization Error: You don't have permission to access or create the file share.");                
+                Console.WriteLine($"[ERROR] Please ensure your account has been granted the 'Storage File Data SMB Share Elevated Contributor' role on the '{storageAccount}' storage account.");
+                Console.ResetColor();
+                
+                // Log detailed information for troubleshooting
+                string detailedError = $"{ex.Message}\nTime:{DateTime.Now}\nStatus: {ex.Status} ({ex.ErrorCode})";
+                Logger.LogError($"Authorization error checking/creating file share: {detailedError}");
+                
+                // Add more specific error analysis to help pinpoint the exact permission issue
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"[DETAIL] Error code: {ex.ErrorCode}");
+                
+                if (ex.Message.Contains("This request is not authorized to perform this operation"))
+                {
+                    Console.WriteLine($"[DETAIL] The current authorization method doesn't have the required permissions.");
+                    Console.WriteLine($"[DETAIL] Try running the File Share Permission Diagnostics (option 5 in main menu) to identify specific missing permissions.");
+                }
+                
+                Console.ResetColor();
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"[ERROR] Failed to verify or create file share: {ex.Message}");
+                Console.ResetColor();
+                Logger.LogError($"Error checking/creating file share: {ex.Message}");
+                return false;
+            }
+        }        /// <summary>
         /// Gets a list of directories and files at the specified path in the Azure File Share.
         /// </summary>
         /// <param name="directoryPath">The path to the directory to list (empty for root).</param>
@@ -46,6 +113,15 @@ namespace AzureStorageManager.Services
             
             try
             {
+                // First check if the share exists
+                bool shareExists = await EnsureShareExistsAsync(false);
+                if (!shareExists)
+                {
+                    throw new Azure.RequestFailedException(
+                        404, 
+                        $"The file share '{_fileShareName}' does not exist. Please verify the share name or use the create option.");
+                }
+                
                 // Get the directory client for the specified path
                 ShareDirectoryClient directoryClient;
                 if (string.IsNullOrEmpty(directoryPath))
@@ -156,13 +232,38 @@ namespace AzureStorageManager.Services
             Console.WriteLine("------------------------------------------------------------------");
             return (items, parentPath);
         }
-        
-        /// <summary>
+          /// <summary>
         /// Allows the user to interactively browse and select a directory in the Azure File Share.
         /// </summary>
         /// <returns>The selected directory path</returns>
         public async Task<string> BrowseAndSelectDirectoryAsync()
         {
+            // First check if the share exists
+            bool shareExists = await EnsureShareExistsAsync(false);
+            if (!shareExists)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"[WARNING] The file share '{_fileShareName}' does not exist.");
+                Console.WriteLine($"Would you like to create this file share? (yes/no): ");
+                Console.ResetColor();
+                
+                string response = Console.ReadLine()?.Trim().ToLower() ?? "";
+                if (response == "yes" || response == "y")
+                {
+                    shareExists = await EnsureShareExistsAsync(true);
+                    if (!shareExists)
+                    {
+                        Console.WriteLine("[ERROR] Failed to create file share. Using root directory instead.");
+                        return "";
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("[INFO] File share not created. Using root directory instead.");
+                    return "";
+                }
+            }
+            
             string currentPath = "";
             bool selectionCompleted = false;
             
@@ -401,6 +502,286 @@ namespace AzureStorageManager.Services
                     Console.WriteLine($"[DEBUG] {ex}");
                 }
                 throw;
+            }
+        }
+
+        /// <summary>
+        /// Diagnoses Azure File Share permission issues by testing different operations
+        /// </summary>
+        /// <returns>A task representing the asynchronous operation</returns>
+        public async Task DiagnosePermissionsAsync()
+        {
+            // Dictionary to store test results
+            var testResults = new Dictionary<string, bool>();
+            
+            // Set up a test directory and file path for diagnostics
+            string testDirPath = "permission-diagnostics-" + DateTime.Now.ToString("yyyyMMddHHmmss");
+            string testFilePath = testDirPath + "/test-file.txt";
+            string testContent = "This is a test file for permission diagnostics.";
+            
+            Console.WriteLine("\n[TEST] Running permission diagnostics on File Share operations...");
+              // Test 1: Check if share exists
+            try
+            {
+                Console.Write("[TEST] 1. Checking if file share exists... ");
+                // Use our custom extension method that ensures the header is present
+                var exists = await Utilities.FileShareClientExtensions.ExistsWithIntentHeaderAsync(_shareClient);                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine("SUCCESS");
+                Console.ResetColor();
+                testResults["Check share exists"] = true;
+                Console.WriteLine($"       File share '{_fileShareName}' {(exists ? "exists" : "does not exist")}");
+                
+                // If the share doesn't exist, ask if we should create it for the diagnostics
+                if (!exists)
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine($"[NOTICE] The file share '{_fileShareName}' doesn't exist, which will cause the remaining tests to fail.");
+                    Console.Write($"[PROMPT] Would you like to create the file share for testing purposes? (yes/no): ");
+                    Console.ResetColor();
+                    
+                    string response = Console.ReadLine()?.Trim().ToLower() ?? "no";
+                    if (response == "yes" || response == "y")
+                    {
+                        try
+                        {
+                            Console.Write($"[INFO] Creating file share '{_fileShareName}'... ");
+                            await _shareClient.CreateAsync();
+                            Console.ForegroundColor = ConsoleColor.Green;
+                            Console.WriteLine("SUCCESS");
+                            Console.ResetColor();
+                            Console.WriteLine($"[INFO] File share '{_fileShareName}' created successfully.");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.ForegroundColor = ConsoleColor.Red;
+                            Console.WriteLine("FAILED");
+                            Console.ResetColor();
+                            Console.WriteLine($"[ERROR] Failed to create file share: {ex.Message}");
+                            Logger.LogError($"File share creation failed during diagnostics: {ex}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[INFO] Continuing with diagnostics. Some tests will be skipped due to missing file share.");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("FAILED");
+                Console.ResetColor();
+                testResults["Check share exists"] = false;
+                Console.WriteLine($"       Error: {ex.Message}");
+                Logger.LogError($"File share existence check failed: {ex}");
+            }
+              // Test 2: Create directory
+            ShareDirectoryClient? dirClient = null;
+            try
+            {
+                Console.Write("[TEST] 2. Creating a test directory... ");
+                dirClient = _shareClient.GetDirectoryClient(testDirPath);
+                
+                // Use the helper method to create the directory with the proper header
+                await Utilities.FileShareClientExtensions.CreateDirectoryWithIntentHeaderAsync(dirClient);
+                
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine("SUCCESS");
+                Console.ResetColor();
+                testResults["Create directory"] = true;
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("FAILED");
+                Console.ResetColor();
+                testResults["Create directory"] = false;
+                Console.WriteLine($"       Error: {ex.Message}");
+                Logger.LogError($"Directory creation failed: {ex}");
+            }
+            
+            // Test 3: Upload a file
+            ShareFileClient? fileClient = null;
+            if (dirClient != null && testResults["Create directory"])
+            {
+                try
+                {                    Console.Write("[TEST] 3. Uploading a test file... ");
+                    fileClient = dirClient.GetFileClient("test-file.txt");
+                    using (var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(testContent)))
+                    {
+                        // Use the helper method to create the file with the proper header
+                        await Utilities.FileShareClientExtensions.CreateFileWithIntentHeaderAsync(fileClient, stream.Length);
+                        await fileClient.UploadRangeAsync(new HttpRange(0, stream.Length), stream);
+                    }
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine("SUCCESS");
+                    Console.ResetColor();
+                    testResults["Upload file"] = true;
+                }
+                catch (Exception ex)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("FAILED");
+                    Console.ResetColor();
+                    testResults["Upload file"] = false;
+                    Console.WriteLine($"       Error: {ex.Message}");
+                    Logger.LogError($"File upload failed: {ex}");
+                }
+            }
+            else
+            {
+                Console.WriteLine("[TEST] 3. Uploading a test file... SKIPPED (directory creation failed)");
+                testResults["Upload file"] = false;
+            }
+            
+            // Test 4: Download file
+            if (fileClient != null && testResults["Upload file"])
+            {
+                try
+                {
+                    Console.Write("[TEST] 4. Downloading the test file... ");
+                    var downloadInfo = await fileClient.DownloadAsync();
+                    using (var stream = new MemoryStream())
+                    {
+                        await downloadInfo.Value.Content.CopyToAsync(stream);
+                        string downloadedContent = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+                        bool contentMatches = downloadedContent == testContent;
+                        
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.WriteLine("SUCCESS");
+                        Console.ResetColor();
+                        testResults["Download file"] = true;
+                        Console.WriteLine($"       Content verification: {(contentMatches ? "Passed" : "Failed")}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("FAILED");
+                    Console.ResetColor();
+                    testResults["Download file"] = false;
+                    Console.WriteLine($"       Error: {ex.Message}");
+                    Logger.LogError($"File download failed: {ex}");
+                }
+            }
+            else
+            {
+                Console.WriteLine("[TEST] 4. Downloading the test file... SKIPPED (file upload failed)");
+                testResults["Download file"] = false;
+            }
+            
+            // Test 5: Delete file
+            if (fileClient != null && testResults["Upload file"])
+            {
+                try
+                {
+                    Console.Write("[TEST] 5. Deleting the test file... ");
+                    await fileClient.DeleteAsync();
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine("SUCCESS");
+                    Console.ResetColor();
+                    testResults["Delete file"] = true;
+                }
+                catch (Exception ex)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("FAILED");
+                    Console.ResetColor();
+                    testResults["Delete file"] = false;
+                    Console.WriteLine($"       Error: {ex.Message}");
+                    Logger.LogError($"File deletion failed: {ex}");
+                }
+            }
+            else
+            {
+                Console.WriteLine("[TEST] 5. Deleting the test file... SKIPPED (file upload failed)");
+                testResults["Delete file"] = false;
+            }
+            
+            // Test 6: Delete directory
+            if (dirClient != null && testResults["Create directory"])
+            {
+                try
+                {
+                    Console.Write("[TEST] 6. Deleting the test directory... ");
+                    await dirClient.DeleteAsync();
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine("SUCCESS");
+                    Console.ResetColor();
+                    testResults["Delete directory"] = true;
+                }
+                catch (Exception ex)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("FAILED");
+                    Console.ResetColor();
+                    testResults["Delete directory"] = false;
+                    Console.WriteLine($"       Error: {ex.Message}");
+                    Logger.LogError($"Directory deletion failed: {ex}");
+                }
+            }
+            else
+            {
+                Console.WriteLine("[TEST] 6. Deleting the test directory... SKIPPED (directory creation failed)");
+                testResults["Delete directory"] = false;
+            }
+            
+            // Display summary of test results
+            Console.WriteLine("\n[SUMMARY] Azure File Share Permission Diagnostics Results:");
+            Console.WriteLine("-----------------------------------------------------------");
+            
+            int passedTests = testResults.Count(r => r.Value);
+            int totalTests = testResults.Count;
+            
+            foreach (var result in testResults)
+            {
+                if (result.Value)
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"✓ {result.Key}: Passed");
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"✗ {result.Key}: Failed");
+                }
+                Console.ResetColor();
+            }
+            
+            Console.WriteLine("-----------------------------------------------------------");
+            Console.WriteLine($"Passed: {passedTests}/{totalTests} tests");
+            
+            // Provide specific role recommendations based on the test results
+            Console.WriteLine();
+            if (passedTests == totalTests)
+            {
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine("[RESULT] All permission tests passed. Your current role has full access to this file share.");
+                Console.ResetColor();
+            }
+            else if (!testResults["Check share exists"])
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("[RESULT] You don't have permission to access this file share at all.");
+                Console.WriteLine("[RECOMMENDATION] Request the 'Storage File Data Reader' role at minimum for read access,");
+                Console.WriteLine("            or 'Storage File Data SMB Share Elevated Contributor' for full access.");
+                Console.ResetColor();
+            }
+            else if (!testResults["Create directory"] || !testResults["Upload file"])
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("[RESULT] You have read access but not sufficient permissions to create or modify content.");
+                Console.WriteLine("[RECOMMENDATION] Request the 'Storage File Data SMB Share Elevated Contributor' role");
+                Console.WriteLine("            instead of 'Storage File Data Privileged Contributor' that you might currently have.");
+                Console.ResetColor();
+            }
+            else if (!testResults["Delete file"] || !testResults["Delete directory"])
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("[RESULT] You have most permissions but can't delete content.");
+                Console.WriteLine("[RECOMMENDATION] Request the 'Storage File Data SMB Share Elevated Contributor' role");
+                Console.WriteLine("            for complete access to all file share operations.");
+                Console.ResetColor();
             }
         }
     }

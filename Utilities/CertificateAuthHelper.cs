@@ -1,139 +1,109 @@
-using System;
-using System.Security.Cryptography.X509Certificates;
 using Azure.Core;
 using Azure.Identity;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using AzureStorageManager.Models;
+using System;
 using System.IO;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace AzureStorageManager.Utilities
 {
-    /// <summary>
-    /// Helper class for certificate-based authentication with failover capabilities
-    /// </summary>
-    public class CertificateAuthHelper
+    public static class CertificateAuthHelper
     {
-        private readonly List<CertificateConfig> _certificates = new();
-        private int _currentCertificateIndex = 0;
-        private readonly string _tenantId;
-        private readonly string _clientId;
-
         /// <summary>
-        /// Creates a new certificate authentication helper
+        /// Creates a TokenCredential using a certificate for authentication
         /// </summary>
         /// <param name="tenantId">Azure AD tenant ID</param>
-        /// <param name="clientId">Client/Application ID</param>
-        public CertificateAuthHelper(string tenantId, string clientId)
-        {
-            _tenantId = tenantId ?? throw new ArgumentNullException(nameof(tenantId));
-            _clientId = clientId ?? throw new ArgumentNullException(nameof(clientId));
-        }
-
-        /// <summary>
-        /// Adds a certificate to the failover chain
-        /// </summary>
-        /// <param name="certPath">Path to .pfx file</param>
-        /// <param name="certPassword">Certificate password</param>
-        /// <param name="certName">Display name for the certificate</param>
-        public void AddCertificate(string certPath, string certPassword, string certName = "")
-        {
-            if (string.IsNullOrWhiteSpace(certPath))
-                throw new ArgumentException("Certificate path cannot be empty", nameof(certPath));
-
-            if (!File.Exists(certPath))
-                throw new FileNotFoundException($"Certificate file not found: {certPath}");
-
-            // Use filename as name if no name provided
-            if (string.IsNullOrWhiteSpace(certName))
-            {
-                certName = Path.GetFileNameWithoutExtension(certPath);
-            }
-
-            _certificates.Add(new CertificateConfig
-            {
-                Path = certPath,
-                Password = certPassword,
-                Name = certName
-            });
-
-            Logger.LogInfo($"Added certificate '{certName}' to authentication chain");
-        }
-
-        /// <summary>
-        /// Creates a token credential using the current certificate in the failover chain
-        /// </summary>
+        /// <param name="clientId">Application (client) ID</param>
+        /// <param name="certificateThumbprint">Thumbprint of the certificate to use</param>
         /// <returns>TokenCredential for Azure authentication</returns>
-        public TokenCredential GetCredential()
+        public static TokenCredential CreateCertificateCredential(string tenantId, string clientId, string certificateThumbprint)
         {
-            if (_certificates.Count == 0)
-                throw new InvalidOperationException("No certificates configured for authentication");
-
-            var certConfig = _certificates[_currentCertificateIndex];
-            
             try
             {
-                X509Certificate2 cert = new X509Certificate2(certConfig.Path, certConfig.Password);
-                Logger.LogInfo($"Using certificate: {certConfig.Name} (Index: {_currentCertificateIndex + 1}/{_certificates.Count})");
+                // Find certificate by thumbprint in the certificate store
+                var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
+                store.Open(OpenFlags.ReadOnly);
                 
-                ClientCertificateCredential credential = new ClientCertificateCredential(
-                    _tenantId,
-                    _clientId,
-                    cert
-                );
+                // Find certificate by thumbprint
+                var certificateCollection = store.Certificates.Find(
+                    X509FindType.FindByThumbprint,
+                    certificateThumbprint,
+                    false);
+                
+                store.Close();
+                
+                if (certificateCollection.Count == 0)
+                {
+                    throw new InvalidOperationException($"Certificate with thumbprint {certificateThumbprint} not found in the CurrentUser\\My store.");
+                }
+                
+                var certificate = certificateCollection[0];
+                
+                // Create credential using the certificate
+                var credential = new ClientCertificateCredential(
+                    tenantId,
+                    clientId,
+                    certificate);
                 
                 return credential;
             }
             catch (Exception ex)
             {
-                Logger.LogError($"Error loading certificate '{certConfig.Name}': {ex.Message}");
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"[ERROR] Failed to create certificate credential: {ex.Message}");
+                Console.ResetColor();
+                
                 throw;
             }
         }
-
+        
         /// <summary>
-        /// Moves to the next certificate in the failover chain
+        /// Creates a TokenCredential using a certificate file for authentication
         /// </summary>
-        /// <returns>True if moved to another certificate, False if no more certificates available</returns>
-        public bool TryMoveToNextCertificate()
+        /// <param name="tenantId">Azure AD tenant ID</param>
+        /// <param name="clientId">Application (client) ID</param>
+        /// <param name="certificatePath">Path to the certificate file (.pfx)</param>
+        /// <param name="certificatePassword">Password for the certificate file</param>
+        /// <returns>TokenCredential for Azure authentication</returns>
+        public static TokenCredential CreateCertificateCredentialFromFile(string tenantId, string clientId, string certificatePath, string certificatePassword)
         {
-            if (_currentCertificateIndex < _certificates.Count - 1)
+            try
             {
-                _currentCertificateIndex++;
-                Logger.LogInfo($"Switching to next certificate: {_certificates[_currentCertificateIndex].Name}");
-                return true;
+                if (!File.Exists(certificatePath))
+                {
+                    throw new FileNotFoundException($"Certificate file not found: {certificatePath}");
+                }
+                  // Load certificate for authentication
+                X509Certificate2 certificate;
+                
+                try {
+                    // Modern approach for .NET 9.0 using X509Certificate2 constructor directly with byte array
+                    byte[] certBytes = File.ReadAllBytes(certificatePath);
+                    certificate = new X509Certificate2(certBytes, certificatePassword, 
+                        X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.Exportable);
+                }
+                catch (Exception certEx)
+                {
+                    throw new InvalidOperationException($"Failed to load certificate from file: {certEx.Message}", certEx);
+                }
+                
+                // Create credential using the certificate
+                var credential = new ClientCertificateCredential(
+                    tenantId,
+                    clientId,
+                    certificate);
+                
+                return credential;
             }
-            
-            Logger.LogWarning("No more certificates available in the failover chain");
-            return false;
-        }
-
-        /// <summary>
-        /// Gets the current certificate name
-        /// </summary>
-        public string GetCurrentCertificateName()
-        {
-            if (_certificates.Count == 0)
-                return "No certificate";
-
-            return _certificates[_currentCertificateIndex].Name;
-        }
-
-        /// <summary>
-        /// Gets the total number of certificates in the failover chain
-        /// </summary>
-        public int CertificateCount => _certificates.Count;
-
-        /// <summary>
-        /// Configuration for a certificate
-        /// </summary>
-        private class CertificateConfig
-        {
-            public string Path { get; set; } = "";
-            public string Password { get; set; } = "";
-            public string Name { get; set; } = "";
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"[ERROR] Failed to create certificate credential from file: {ex.Message}");
+                Console.ResetColor();
+                
+                throw;
+            }
         }
     }
 }

@@ -1,0 +1,204 @@
+/// <summary>
+/// Configures proxy settings from the settings menu
+/// </summary>
+private static void ConfigureProxySettings()
+{
+    Console.Clear();
+    Console.WriteLine("=== Configure Proxy Settings ===");
+    
+    // Display current proxy configuration
+    string proxyStatus = Services.ProxyService.IsProxyConfigured 
+        ? Services.ProxyService.ProxyInfo 
+        : "No proxy configured";
+    Console.WriteLine($"Current Proxy Status: {proxyStatus}\n");
+    
+    Console.WriteLine("Select an option:");
+    Console.WriteLine("1. Enable proxy");
+    Console.WriteLine("2. Disable proxy");
+    Console.WriteLine("3. Return to Settings Menu");
+    
+    Console.Write("\nYour choice: ");
+    string? choice = Console.ReadLine()?.Trim();
+    
+    switch (choice)
+    {
+        case "1":
+            Console.Write("Enter the proxy URL (without http:// prefix): ");
+            string proxyUrl = Console.ReadLine()?.Trim() ?? "";
+            
+            Console.Write("Enter the proxy port: ");
+            string proxyPort = Console.ReadLine()?.Trim() ?? "";
+            
+            if (string.IsNullOrEmpty(proxyUrl) || string.IsNullOrEmpty(proxyPort) || !int.TryParse(proxyPort, out int port))
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("[ERROR] Invalid proxy URL or port.");
+                Console.ResetColor();
+                Console.WriteLine("Press any key to continue...");
+                Console.ReadKey();
+                return;
+            }
+            
+            Console.Write("Does your proxy require authentication? (yes/no): ");
+            string requiresAuth = Console.ReadLine()?.Trim().ToLower() ?? "no";
+            
+            string username = "";
+            string password = "";
+            if (requiresAuth == "yes" || requiresAuth == "y")
+            {
+                Console.Write("Enter the proxy username: ");
+                username = Console.ReadLine()?.Trim() ?? "";
+                
+                Console.Write("Enter the proxy password: ");
+                password = ReadPasswordFromConsole();
+            }
+            
+            // Save the proxy settings to configuration
+            try
+            {
+                if (_config != null)
+                {
+                    // Read the current appsettings.json
+                    string appSettingsPath = Path.Combine(Directory.GetCurrentDirectory(), "appsettings.json");
+                    string json = File.ReadAllText(appSettingsPath);
+                    var jsonConfig = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(json);
+                    
+                    if (jsonConfig != null)
+                    {
+                        // Create or update the proxy section
+                        var proxyConfig = new Dictionary<string, object>
+                        {
+                            { "UseProxy", true },
+                            { "ProxyUrl", proxyUrl },
+                            { "ProxyPort", proxyPort }
+                        };
+                        
+                        if (!string.IsNullOrEmpty(username))
+                            proxyConfig["Username"] = username;
+                            
+                        if (!string.IsNullOrEmpty(password))
+                            proxyConfig["Password"] = password;
+                            
+                        jsonConfig["Proxy"] = proxyConfig;
+                        
+                        // Save the updated configuration
+                        string updatedJson = System.Text.Json.JsonSerializer.Serialize(jsonConfig, 
+                            new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+                        File.WriteAllText(appSettingsPath, updatedJson);
+                        
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.WriteLine("[SUCCESS] Proxy settings saved to configuration file.");
+                        Console.ResetColor();
+                        
+                        // Initialize the proxy with new settings
+                        var proxy = new System.Net.WebProxy($"{proxyUrl}:{port}");
+                        if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
+                        {
+                            proxy.Credentials = new System.Net.NetworkCredential(username, password);
+                        }
+                        
+                        // Update global proxy and HttpClient
+                        System.Net.WebRequest.DefaultWebProxy = proxy;
+                        var httpClientHandler = new System.Net.Http.HttpClientHandler
+                        {
+                            Proxy = proxy,
+                            UseProxy = true
+                        };
+                        _httpClient = new System.Net.Http.HttpClient(httpClientHandler);
+                        
+                        // Update the proxy service state
+                        Services.ProxyService.UpdateProxyStatus(true, $"Proxy: {proxyUrl}:{port}" + 
+                            (!string.IsNullOrEmpty(username) ? " (authenticated)" : ""));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"[ERROR] Failed to save proxy settings: {ex.Message}");
+                Console.ResetColor();
+                Logger.LogError($"Failed to save proxy settings: {ex}");
+            }
+            
+            break;
+            
+        case "2":
+            // Disable proxy
+            try
+            {
+                if (_config != null)
+                {
+                    // Read the current appsettings.json
+                    string appSettingsPath = Path.Combine(Directory.GetCurrentDirectory(), "appsettings.json");
+                    string json = File.ReadAllText(appSettingsPath);
+                    var jsonConfig = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(json);
+                    
+                    if (jsonConfig != null)
+                    {
+                        // Create or update the proxy section to disable it
+                        var proxyConfig = new Dictionary<string, object>
+                        {
+                            { "UseProxy", false }
+                        };
+                        
+                        // Keep the existing proxy details in case they're needed later, just disable usage
+                        if (jsonConfig.ContainsKey("Proxy") && jsonConfig["Proxy"] is System.Text.Json.JsonElement proxyElement)
+                        {
+                            try
+                            {
+                                if (proxyElement.TryGetProperty("ProxyUrl", out var urlElement))
+                                    proxyConfig["ProxyUrl"] = urlElement.GetString() ?? "";
+                                
+                                if (proxyElement.TryGetProperty("ProxyPort", out var portElement))
+                                    proxyConfig["ProxyPort"] = portElement.GetString() ?? "";
+                                
+                                if (proxyElement.TryGetProperty("Username", out var userElement))
+                                    proxyConfig["Username"] = userElement.GetString() ?? "";
+                                
+                                if (proxyElement.TryGetProperty("Password", out var passElement))
+                                    proxyConfig["Password"] = passElement.GetString() ?? "";
+                            }
+                            catch { /* Ignore errors accessing properties */ }
+                        }
+                        
+                        jsonConfig["Proxy"] = proxyConfig;
+                        
+                        // Save the updated configuration
+                        string updatedJson = System.Text.Json.JsonSerializer.Serialize(jsonConfig, 
+                            new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+                        File.WriteAllText(appSettingsPath, updatedJson);
+                        
+                        // Reset proxy settings
+                        System.Net.WebRequest.DefaultWebProxy = null;
+                        _httpClient = new System.Net.Http.HttpClient();
+                        
+                        // Update the proxy service state
+                        Services.ProxyService.UpdateProxyStatus(false, "No proxy configured");
+                        
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.WriteLine("[SUCCESS] Proxy disabled successfully.");
+                        Console.ResetColor();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"[ERROR] Failed to disable proxy: {ex.Message}");
+                Console.ResetColor();
+                Logger.LogError($"Failed to disable proxy: {ex}");
+            }
+            break;
+            
+        case "3":
+            // Return to settings menu
+            break;
+            
+        default:
+            Console.WriteLine("Invalid option.");
+            break;
+    }
+    
+    Console.WriteLine("\nPress any key to continue...");
+    Console.ReadKey();
+}
