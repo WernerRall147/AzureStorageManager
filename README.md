@@ -9,6 +9,7 @@
 - **Download files from Azure**: Download files from Azure Blob Storage or File Shares with integrity verification.
 - **Supports Azure Blob Storage and Azure File Shares**: Use the tool for different Azure storage types.
 - **CSV Report Generation**: Produces a detailed report showing processed files, MD5 hashes, and match statuses.
+- **Upload Size Calculation**: Shows total upload size before transfer to help estimate time requirements.
 - **Self-contained executable**: Distribute the tool as a single executable for easy deployment.
 
 ## Requirements
@@ -163,6 +164,17 @@ This tool supports authentication with Azure using service principals (app regis
    - **Missing in Azure**: File exists locally but not in Azure storage
    - **Missing Locally**: File exists in Azure storage but not locally
    - **No Hash in Azure**: File exists in both locations but no hash in Azure metadata
+
+### Progress Reporting
+
+The tool features comprehensive progress reporting for all operations:
+
+- Real-time upload and download progress with percentage completion
+- Transfer speed calculations (KB/s or files/sec)
+- Estimated time remaining for long-running operations
+- Spinning animation indicators for operations in progress
+- Color-coded status messages for better visibility
+- Summary statistics upon operation completion
 
 ## Configuration
 

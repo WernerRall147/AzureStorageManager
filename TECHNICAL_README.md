@@ -156,6 +156,12 @@ The application uses `appsettings.json` for storing configuration:
    - Less secure than certificate authentication but simpler to set up
    - Configuration in `appsettings.json` under the Azure section
 
+4. **Interactive Browser Login**
+   - Fallback authentication method when certificate and client secret methods fail
+   - Opens a browser window for interactive authentication
+   - Most user-friendly option for occasional use
+   - No pre-configuration required, but requires user interaction
+
 ### Certificate Authentication
 - Self-signed certificates can be generated using the `SelfSignedCert.ps1` script
 - Certificates need to be uploaded to the app registration in Azure Portal
@@ -191,6 +197,7 @@ The application uses `appsettings.json` for storing configuration:
 
 #### Upload Operations
 - Files can be uploaded to both Azure Blob Storage and Azure File Shares
+- Total upload size is calculated and displayed before transfer begins
 - Directory structure is preserved during upload
 - MD5 hashes are calculated and stored as metadata with each file
 - Parallel uploads improve performance for multiple files

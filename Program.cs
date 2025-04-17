@@ -1223,11 +1223,15 @@ private static async Task CopyFilesToAzureAsync()
                     Console.Write("Enter your Azure File Share Name: ");
                     fileShareName = Console.ReadLine() ?? "";
                     Models.ConnectionState.FileShareName = fileShareName;
-                }                var shareServiceClient = new ShareServiceClient(new Uri($"https://{storageAccountName}.file.core.windows.net"), _credential, shareClientOptions);
+                }                
+                
+                var shareServiceClient = new ShareServiceClient(new Uri($"https://{storageAccountName}.file.core.windows.net"), _credential, shareClientOptions);
                 var permissionTestShareClient = shareServiceClient.GetShareClient(fileShareName);
 
                 // Use our enhanced existence checking method instead of the direct ExistsAsync call
-                bool shareExists = await Utilities.FileShareClientExtensions.ExistsWithIntentHeaderAsync(permissionTestShareClient);                if (!shareExists)
+                bool shareExists = await Utilities.FileShareClientExtensions.ExistsWithIntentHeaderAsync(permissionTestShareClient);                
+                
+                if (!shareExists)
                 {
                     Console.WriteLine($"[WARNING] File share '{fileShareName}' does not exist.");
                     Console.Write("Would you like to create it now? (yes/no): ");
@@ -1341,52 +1345,12 @@ private static async Task CopyFilesToAzureAsync()
                 totalBytes += fileInfo.Length;
             }
             catch { } // Ignore files we can't access
-        }                // Format total size for display
+        }        // Format total size for display
         string totalSizeFormatted = totalBytes < 1024 * 1024 ?
             $"{totalBytes / 1024.0:F1} KB" :
             $"{totalBytes / (1024.0 * 1024.0):F1} MB";
 
         Console.WriteLine($"[INFO] Total upload size: {totalSizeFormatted}");
-
-        // Create cancellation token source for progress task
-        var cts = new CancellationTokenSource();
-
-        // Start progress reporting task
-        var progressTask = Task.Run(async () =>
-        {
-            string[] spinner = new[] { "⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷" };
-            int spinnerPos = 0;
-
-            while (!cts.Token.IsCancellationRequested)
-            {
-                lock (lockObj)
-                {
-                    var percent = filesToUpload.Length > 0 ? uploaded * 100 / filesToUpload.Length : 0;
-                    var bytesPercent = totalBytes > 0 ? uploadedBytes * 100 / totalBytes : 0;
-                    var elapsed = DateTime.Now - startTime;
-                    var speed = elapsed.TotalSeconds > 0 ? uploadedBytes / elapsed.TotalSeconds / 1024 : 0; // KB/s
-
-                    string uploadedSizeFormatted = uploadedBytes < 1024 * 1024 ?
-                        $"{uploadedBytes / 1024.0:F1} KB" :
-                        $"{uploadedBytes / (1024.0 * 1024.0):F1} MB";
-
-                    Console.Write($"\r[WORKING] {spinner[spinnerPos]} Uploaded: {uploaded}/{filesToUpload.Length} files ({percent}%) " +
-                                $"| {uploadedSizeFormatted} of {totalSizeFormatted} ({bytesPercent}%) | {speed:F1} KB/s    ");
-                }
-
-                spinnerPos = (spinnerPos + 1) % spinner.Length;
-                await Task.Delay(200, cts.Token);
-            }
-        });
-
-        Console.WriteLine("[INFO] Beginning upload process. This may take some time depending on file sizes...");
-
-        // Implement actual file uploading - not a simulation anymore
-        // Create lists to track failures and semaphores to limit concurrency
-        var failedFiles = new List<string>();
-        int maxConcurrentUploads = 4; // Limit concurrent uploads to prevent throttling
-        using var semaphore = new System.Threading.SemaphoreSlim(maxConcurrentUploads);
-        var uploadTasks = new List<Task>();
 
         // Prepare clients based on the storage type
         ShareClient? shareClient = null;
@@ -1424,9 +1388,106 @@ private static async Task CopyFilesToAzureAsync()
                 _credential,
                 shareClientOptions);
 
-            shareClient = shareServiceClient.GetShareClient(Models.ConnectionState.FileShareName);
-            rootDirClient = shareClient.GetRootDirectoryClient();
-        }            // Process all files for upload
+            if (!string.IsNullOrEmpty(Models.ConnectionState.FileShareName))
+            {
+                shareClient = shareServiceClient.GetShareClient(Models.ConnectionState.FileShareName);
+
+                // Allow the user to browse and select a directory within the Azure File Share
+                Console.WriteLine("[INFO] Preparing to browse Azure File Share directories...");
+                Console.WriteLine("You'll be able to select where in the Azure File Share to upload files.");
+                Console.WriteLine("Press any key to continue to the directory browser...");
+                Console.ReadKey(true);
+
+                string azureDirectoryPath = "";
+                try
+                {
+                    // Create a FileShareService to use its directory browsing capability
+                    if (_credential != null && shareClient != null)
+                    {
+                        var fileShareService = new AzureStorageManager.Services.FileShareService(
+                            $"https://{storageAccountName}.file.core.windows.net", 
+                            Models.ConnectionState.FileShareName ?? "", 
+                            _credential, 
+                            shareClientOptions);
+                        
+                        azureDirectoryPath = await fileShareService.BrowseAndSelectDirectoryAsync();
+                        if (string.IsNullOrEmpty(azureDirectoryPath))
+                        {
+                            Console.WriteLine("[INFO] No Azure directory selected or operation cancelled. Using root directory.");
+                            rootDirClient = shareClient.GetRootDirectoryClient();
+                        }
+                        else
+                        {
+                            Console.WriteLine($"[INFO] Selected Azure directory: {azureDirectoryPath}");
+                            rootDirClient = shareClient.GetDirectoryClient(azureDirectoryPath);
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("[WARNING] Cannot browse directories due to missing credentials or share client.");
+                        if (shareClient != null)
+                        {
+                            rootDirClient = shareClient.GetRootDirectoryClient();
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[WARNING] Error browsing Azure directories: {ex.Message}. Using root directory instead.");
+                    Console.WriteLine($"[DEBUG] {ex}");
+                    if (shareClient != null)
+                    {
+                        rootDirClient = shareClient.GetRootDirectoryClient();
+                    }
+                }
+            }            else
+            {
+                Console.WriteLine("[ERROR] File share name is missing. Cannot proceed with upload.");
+                return;
+            }
+        }
+
+        // Now that all preparations are complete and user has selected target directory, start progress reporting
+        Console.WriteLine("[INFO] Beginning upload process. This may take some time depending on file sizes...");
+        
+        // Create cancellation token source for progress task
+        var cts = new CancellationTokenSource();
+
+        // Start progress reporting task
+        var progressTask = Task.Run(async () =>
+        {
+            string[] spinner = new[] { "⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷" };
+            int spinnerPos = 0;
+
+            while (!cts.Token.IsCancellationRequested)
+            {
+                lock (lockObj)
+                {
+                    var percent = filesToUpload.Length > 0 ? uploaded * 100 / filesToUpload.Length : 0;
+                    var bytesPercent = totalBytes > 0 ? uploadedBytes * 100 / totalBytes : 0;
+                    var elapsed = DateTime.Now - startTime;
+                    var speed = elapsed.TotalSeconds > 0 ? uploadedBytes / elapsed.TotalSeconds / 1024 : 0; // KB/s
+
+                    string uploadedSizeFormatted = uploadedBytes < 1024 * 1024 ?
+                        $"{uploadedBytes / 1024.0:F1} KB" :
+                        $"{uploadedBytes / (1024.0 * 1024.0):F1} MB";
+
+                    Console.Write($"\r[WORKING] {spinner[spinnerPos]} Uploaded: {uploaded}/{filesToUpload.Length} files ({percent}%) " +
+                                $"| {uploadedSizeFormatted} of {totalSizeFormatted} ({bytesPercent}%) | {speed:F1} KB/s    ");
+                }
+
+                spinnerPos = (spinnerPos + 1) % spinner.Length;
+                await Task.Delay(200, cts.Token);
+            }
+        });
+
+        // Create lists to track failures and semaphores to limit concurrency
+        var failedFiles = new List<string>();
+        int maxConcurrentUploads = 4; // Limit concurrent uploads to prevent throttling
+        using var semaphore = new System.Threading.SemaphoreSlim(maxConcurrentUploads);
+        var uploadTasks = new List<Task>();
+        
+        // Process all files for upload
         foreach (var localFilePath in filesToUpload)
         {
             // Wait for a slot to become available
@@ -1920,21 +1981,21 @@ private static async Task DownloadFilesFromAzureAsync()
                     Console.WriteLine($"[ERROR] File share '{fileShareName}' does not exist.");
                     Console.ResetColor();
                     return;
-                }
-                
+                               }
+
                 // Ask user for directory path within file share
                 Console.WriteLine("[INFO] Preparing to browse Azure File Share directories...");
                 Console.WriteLine("You'll be able to select which directory in the Azure File Share to download from.");
                 Console.WriteLine("Press any key to continue to the directory browser...");
                 Console.ReadKey(true);
-                
+
                 // Create service
                 var fileShareService = new FileShareService(
                     $"https://{storageAccountName}.file.core.windows.net", 
                     fileShareName, 
                     _credential, 
                     shareClientOptions);
-                
+
                 // Browse for directory
                 string azureDirectoryPath = "";
                 try
@@ -1955,7 +2016,7 @@ private static async Task DownloadFilesFromAzureAsync()
                     Console.WriteLine($"[DEBUG] {ex}");
                     azureDirectoryPath = "";
                 }
-                
+
                 // Get appropriate directory client based on the path
                 ShareDirectoryClient directoryClient;
                 if (string.IsNullOrEmpty(azureDirectoryPath))
@@ -1966,7 +2027,7 @@ private static async Task DownloadFilesFromAzureAsync()
                 {
                     directoryClient = shareClient.GetDirectoryClient(azureDirectoryPath);
                 }
-                
+
                 // Get all files and nested directories (recursive traversal function)
                 var fileList = new List<(ShareFileClient fileClient, string relativePath)>();
                 
